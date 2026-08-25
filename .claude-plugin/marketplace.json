@@ -1,7 +1,7 @@
 {
   "name": "ccfind",
   "owner": {
-    "name": "epogonii"
+    "name": "Evgheni Pogonii"
   },
   "description": "Local-first search tooling for Claude Code. Currently one plugin: ccfind, BM25 full-text search over your own past sessions.",
   "plugins": [
