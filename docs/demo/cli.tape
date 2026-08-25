@@ -15,7 +15,7 @@ Set TypingSpeed 28ms
 Hide
 Type "export CCFIND_CONFIG_DIR=__CORPUS__/.claude CCFIND_OPEN_DRYRUN=1 PS1='$ '; cd __WORK__; clear"
 Enter
-Type "claude --model claude-sonnet-5"
+Type "claude --settings __WORK__/../demo-settings.json --model claude-sonnet-5"
 Enter
 # A fresh directory gets the workspace trust prompt; accept it while hidden.
 Wait+Screen@60s /trust|proceed/
@@ -23,6 +23,9 @@ Sleep 500ms
 Enter
 Wait+Screen@90s /shortcuts|Welcome|Try /
 Sleep 2s
+# Ctrl+L drops the welcome banner: it carries the account name and org.
+Ctrl+L
+Sleep 1200ms
 Show
 Sleep 800ms
 

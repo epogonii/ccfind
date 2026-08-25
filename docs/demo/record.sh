@@ -24,10 +24,18 @@ node "$REPO/docs/demo/filler.mjs" "$CORPUS"
 CCFIND_BIN_DIR="$WORK/bin" node "$REPO/skills/ccfind/scripts/ccfind.mjs" install >/dev/null
 CCFIND_CONFIG_DIR="$CORPUS/.claude" node "$REPO/skills/ccfind/scripts/ccfind.mjs" index
 
+# Recording settings: no status line, default output style. The banner with the
+# account name and organisation is cleared inside the tape with Ctrl+L.
+cat > "$WORK/demo-settings.json" <<'JSON'
+{ "statusLine": { "type": "command", "command": "printf ''" }, "outputStyle": "default" }
+JSON
+
 for tape in cli term; do
   sed -e "s|__CORPUS__|$CORPUS|g" -e "s|__WORK__|$WORK/infra|g" -e "s|__REPO__|$REPO|g" \
       "$REPO/docs/demo/$tape.tape" > "$WORK/$tape.tape"
-  vhs "$WORK/$tape.tape"
+  # CLAUDECODE/CLAUDE_CODE_CHILD_SESSION leak in from a parent session and make
+  # the recorded run print a "transcript saving is off" warning.
+  env -u CLAUDECODE -u CLAUDE_CODE_CHILD_SESSION vhs "$WORK/$tape.tape"
 done
 
 ls -lh "$REPO/docs/demo-cli.gif" "$REPO/docs/demo-term.gif"
