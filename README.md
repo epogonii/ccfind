@@ -1,8 +1,9 @@
 <p align="center">
-  <img src="docs/icon.png" alt="" width="112" height="112">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.png">
+    <img alt="ccfind" src="docs/logo-light.png" width="380">
+  </picture>
 </p>
-
-<h1 align="center">ccfind</h1>
 
 <p align="center">
   <b>Full-text search across your past Claude Code sessions.</b><br>
