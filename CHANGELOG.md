@@ -3,6 +3,19 @@
 All versions are dated 2026-08-25: the project went from first commit to the
 plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.15.1
+
+- Fixed: a session opened by `open` stopped saving its transcript. The terminal
+  was launched with this process's environment, so Claude Code's per-session
+  markers came along, and `CLAUDE_CODE_CHILD_SESSION` told the resumed session
+  it was a child run - which turns transcript persistence off. Every window
+  `open` produced therefore discarded its own conversation and could never be
+  indexed or found again. The launch now hands the terminal an environment with
+  those markers removed: `CLAUDECODE`, `CLAUDE_CODE_CHILD_SESSION`, the session
+  id, entrypoint, exec path, messaging socket and token, and `CLAUDE_PID`.
+  Configuration the user chose, `CLAUDE_CONFIG_DIR` included, is untouched.
+  `pick` handed the same environment to `claude --resume` and is fixed with it.
+
 ## 0.15.0
 
 - Fixed: `open` had no way to open a window on a current GNOME desktop. The

@@ -37,6 +37,25 @@ const K1 = 1.2, B = 0.75;
 const MAX_DF_RATIO = 0.4;     // ignore terms present in >40% of chunks
 const SUBTOKEN_QUERY_WEIGHT = 0.35; // "kube-vip" must beat every stray "kube"
 
+// Claude Code marks its own process environment per session, and every one of
+// those marks is wrong for a window we are about to open on a *different*
+// session. `CLAUDE_CODE_CHILD_SESSION` is the one that costs data: inherited by
+// the resumed run, it turns transcript saving off, so that conversation is never
+// written to disk and ccfind can never find it again. The rest are this session's
+// identity and its IPC channel, equally wrong to hand to another run. Settings
+// the user actually chose - `CLAUDE_CONFIG_DIR` above all - are deliberately
+// absent from this list and pass through untouched.
+const SESSION_MARKERS = [
+  'CLAUDECODE', 'CLAUDE_CODE_CHILD_SESSION', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_SESSION_ID',
+  'CLAUDE_CODE_ENTRYPOINT', 'CLAUDE_CODE_EXECPATH', 'CLAUDE_CODE_MESSAGING_SOCKET',
+  'CLAUDE_CODE_MESSAGING_TOKEN', 'CLAUDE_PID',
+];
+const cleanEnv = () => {
+  const env = { ...process.env };
+  for (const k of SESSION_MARKERS) delete env[k];
+  return env;
+};
+
 // ---------------------------------------------------------------- tokenizer
 
 const SPLIT = /[^\p{L}\p{N}_.-]+/u;
@@ -918,7 +937,7 @@ await import(pathToFileURL(target).href);
   const GRACE_MS = posInt(process.env.CCFIND_OPEN_GRACE_MS, 700);
   const launch = (c, a) => new Promise((resolve) => {
     let child;
-    try { child = spawn(c, a, { stdio: 'ignore', detached: true }); }
+    try { child = spawn(c, a, { stdio: 'ignore', detached: true, env: cleanEnv() }); }
     catch { resolve(false); return; }
     let settled = false;
     const done = (ok) => { if (!settled) { settled = true; clearTimeout(timer); resolve(ok); } };
@@ -956,7 +975,7 @@ await import(pathToFileURL(target).href);
   const dry = !!process.env.CCFIND_PICK_DRYRUN;
   const open = (h) => {
     if (dry) { console.log(h.resume); process.exit(0); }
-    const r = spawnSync('claude', ['--resume', h.session], { stdio: 'inherit' });
+    const r = spawnSync('claude', ['--resume', h.session], { stdio: 'inherit', env: cleanEnv() });
     if (r.error) {
       console.error(`ccfind: could not run claude (${r.error.message})`);
       console.error(h.resume);

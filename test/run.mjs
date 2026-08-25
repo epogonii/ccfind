@@ -253,12 +253,19 @@ ok('a multiplexer wins outright', run(['open', RECENT], { CCFIND_OPEN_DRYRUN: '1
 // with an `osascript` in it. Either way PATH holds nothing else, so every real
 // emulator in the ladder fails to resolve and no window can open by accident.
 const SLEEP = fs.existsSync('/bin/sleep') ? '/bin/sleep' : '/usr/bin/sleep';
+// PATH holds the stub directory and nothing else, so anything a stub runs has to
+// be named by its absolute path.
+const ENVBIN = fs.existsSync('/usr/bin/env') ? '/usr/bin/env' : '/bin/env';
 const FLAG = path.join(ROOT, 'child-ran');
+// The dump path is baked into the stub rather than passed in the environment,
+// because the environment is the thing under test.
+const ENVDUMP = path.join(ROOT, 'child-env');
 const BEHAVIOURS = {
   'ok-fast': 'exit 0',
   fails: 'exit 1',
   signalled: 'kill -TERM $$',
   foreground: `${SLEEP} 3\necho ran > ${FLAG}`,
+  dumpenv: `${ENVBIN} > ${ENVDUMP}\nexit 0`,
 };
 fs.mkdirSync(path.join(STUBS, 'bin'), { recursive: true });
 fs.mkdirSync(path.join(STUBS, 'mac', 'none'), { recursive: true });
@@ -293,6 +300,30 @@ const waited = Date.now() - t0;
 eq('a foreground terminal counts as opened', r.status, 0);
 ok('a foreground terminal does not block until the window closes', waited < 2500, `${waited} ms`);
 ok('the terminal outlives the process that started it', !fs.existsSync(FLAG), 'child finished too early to prove anything');
+
+// Claude Code's per-session markers must not reach the window we open, or the
+// resumed session inherits `CLAUDE_CODE_CHILD_SESSION`, stops saving its
+// transcript, and can never be indexed again. Settings the user chose have to
+// survive the same scrub, so both directions are asserted here.
+r = run(['open', RECENT], {
+  ...only('dumpenv'),
+  TERM_PROGRAM: '',
+  CLAUDECODE: '1',
+  CLAUDE_CODE_CHILD_SESSION: '1',
+  CLAUDE_CODE_SESSION_ID: 'parent-session-id',
+  CLAUDE_CODE_MESSAGING_TOKEN: 'parent-token',
+  CLAUDE_CONFIG_DIR: '/nonexistent/kept-by-design',
+});
+eq('the env-reporting terminal counts as opened', r.status, 0);
+const childEnv = fs.existsSync(ENVDUMP) ? fs.readFileSync(ENVDUMP, 'utf8') : '';
+ok('the opened window reports an environment at all', /^PATH=/m.test(childEnv), 'no environment was captured');
+for (const marker of ['CLAUDECODE', 'CLAUDE_CODE_CHILD_SESSION', 'CLAUDE_CODE_SESSION_ID',
+                      'CLAUDE_CODE_MESSAGING_TOKEN']) {
+  ok(`${marker} does not leak into the opened window`,
+     !new RegExp(`^${marker}=`, 'm').test(childEnv), childEnv);
+}
+ok('CLAUDE_CONFIG_DIR survives the scrub',
+   /^CLAUDE_CONFIG_DIR=\/nonexistent\/kept-by-design$/m.test(childEnv), childEnv);
 
 // ------------------------------------------------------------------ staleness
 
