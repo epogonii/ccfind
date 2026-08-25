@@ -7,6 +7,9 @@ description: Search the user's own past Claude Code sessions by content and repo
 
 Full-text search over the local transcripts in `~/.claude/projects/`.
 
+This skill is user-invocable: `/ccfind:ccfind <query>` runs it with the query as
+the arguments, so there is no separate slash command to keep in step with it.
+
 `--resume` matches a session by id or name only, and `/insights` writes a report
 rather than answering a question. Neither one finds the session where a specific
 thing was discussed. This does.
