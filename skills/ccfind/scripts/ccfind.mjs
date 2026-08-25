@@ -865,8 +865,27 @@ await import(pathToFileURL(target).href);
     console.log(`installed: ${link}`);
     console.log(`  resolves to the installed plugin, currently ${shortPath(self)}`);
     if (!onPath.includes(dir)) {
+      // The startup file to append to is the one the user's own shell reads.
+      // Naming ~/.zshrc to someone running bash sends them to edit a file that
+      // is never sourced, and the command then still does not exist - which
+      // looks like the launcher failed rather than like the wrong advice it is.
+      const sh = path.basename(process.env.SHELL || '');
+      const line = `export PATH="${dir}:$PATH"`;
       console.log(`\n${dir} is not on your PATH. Add it:`);
-      console.log(`  echo 'export PATH="${dir}:$PATH"' >> ~/.zshrc && exec zsh`);
+      if (sh === 'fish') {
+        console.log(`  fish_add_path ${dir}`);
+      } else if (sh === 'bash') {
+        // macOS terminals start login shells, which read ~/.bash_profile and
+        // ignore ~/.bashrc; Linux ones are interactive non-login and do the
+        // opposite.
+        const rc = process.platform === 'darwin' ? '~/.bash_profile' : '~/.bashrc';
+        console.log(`  echo '${line}' >> ${rc} && exec bash`);
+      } else if (sh === 'zsh' || !sh) {
+        console.log(`  echo '${line}' >> ~/.zshrc && exec zsh`);
+      } else {
+        console.log(`  ${line}`);
+        console.log(`  put that line in ${sh}'s startup file to make it stick`);
+      }
     } else {
       console.log('run it as: ccfind pick "<query>"');
     }

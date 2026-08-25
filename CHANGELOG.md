@@ -3,6 +3,27 @@
 All versions are dated 2026-08-25: the project went from first commit to the
 plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.16.2
+
+- `install` names the startup file the user's own shell reads. It printed
+  `>> ~/.zshrc && exec zsh` unconditionally, which is right on a default macOS
+  and wrong everywhere bash is the shell: the user edits a file that is never
+  sourced, `ccfind` still does not exist afterwards, and that looks like the
+  launcher failed rather than like the advice being wrong. `$SHELL` now decides -
+  `~/.bashrc` under bash on Linux, `~/.bash_profile` under bash on macOS, where
+  terminals start login shells, `fish_add_path` under fish, `~/.zshrc` under zsh,
+  and a bare `export PATH` line plus the shell's name for anything else.
+- The 0.16.1 documentation quoted only bash's wording of the error. zsh, the
+  macOS default, says `zsh: command not found: ccfind` - the same words in a
+  different order, which is enough for a reader to conclude the page is about
+  someone else's problem. Both forms are now named.
+- `install` and `uninstall` have tests: 27 of them, over the launcher's contents
+  and executable bit, the version it resolves to, the per-shell PATH advice, and
+  both refusals to touch a file ccfind did not write. They run against a
+  throwaway `CCFIND_BIN_DIR`, so the suite never writes to a real bin directory,
+  and they run on macOS in CI, which is where the shell difference lives. 112
+  tests in total.
+
 ## 0.16.1
 
 - Documented the one step a new user cannot guess. The plugin installs a skill,

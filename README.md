@@ -51,8 +51,9 @@ table, which one to open, and the `/resume` line that switches this window to it
 **In a terminal** - `ccfind pick "<query>"`, arrows or the mouse over every hit,
 `/` to narrow the query without leaving the list, Enter hands the terminal to
 `claude --resume`. A terminal that has never seen ccfind answers
-`bash: ccfind: command not found` - the plugin ships a script, not a command.
-One `install` fixes that for good, no alias to write: see
+`bash: ccfind: command not found` - or, on macOS,
+`zsh: command not found: ccfind`. The plugin ships a script, not a command. One
+`install` fixes that for good, no alias to write: see
 [Terminal command](#terminal-command).
 
 <p align="center">
@@ -259,8 +260,9 @@ node skills/ccfind/scripts/ccfind.mjs bench "q1" "q2"             # latency per 
 ### Terminal command
 
 `ccfind` is not on your PATH out of the box - the plugin ships a script, not a
-binary, so a shell answers `bash: ccfind: command not found` until you run this
-once. One command fixes it, no alias to write. The simplest way is to ask
+binary, so until you run this once a shell answers `bash: ccfind: command not
+found`, or `zsh: command not found: ccfind` on a default macOS. One command fixes
+it, no alias to write. The simplest way is to ask
 Claude Code itself: *"run ccfind install"*. From a plain terminal, point Node at
 the installed plugin (any cached version works - the launcher resolves the
 current one at run time):
@@ -272,7 +274,10 @@ node "$(ls -d ~/.claude/plugins/cache/*/ccfind/*/skills/ccfind/scripts/ccfind.mj
 It writes a small launcher into the first writable directory already on your PATH
 (`~/.local/bin`, `~/bin`, `/usr/local/bin`, or `$CCFIND_BIN_DIR` - which wins if
 set), tells you which one, and prints the `export PATH` line if that directory
-turns out not to be on it. Nothing else on the system is touched.
+turns out not to be on it - naming the startup file your own `$SHELL` reads,
+which is `~/.bashrc` on Linux, `~/.bash_profile` under bash on macOS, `~/.zshrc`
+under zsh, and `fish_add_path` under fish. Nothing else on the system is
+touched.
 
 The launcher looks up the installed plugin version each time it runs, so
 `claude plugin update` needs nothing redone - a plain symlink would not survive
