@@ -17,7 +17,8 @@ Everything happens in one Node process. Two commands, in this order.
 
 ```bash
 node <skill-dir>/scripts/ccfind.mjs index
-node <skill-dir>/scripts/ccfind.mjs search "<query>" --limit 8 --json
+node <skill-dir>/scripts/ccfind.mjs search "<query>" --limit 12 --json
+node <skill-dir>/scripts/ccfind.mjs show <session-id> --json      # one session's turns
 ```
 
 If either command fails with `node: command not found`, stop and tell the user
@@ -56,6 +57,9 @@ user the `resume` command from the hit and let them jump there.
 | `--self` | allow the current session to appear (it is excluded by default) |
 | `--json` | machine-readable output - use this |
 
+`show <id>` takes `--turns N` (default 40) and `--json`. It lists a session's user
+turns in order, so a hit can be understood without opening the transcript.
+
 Useful narrowings: `--field prompt` finds where the *user* raised something,
 `--field output` finds a command's actual output, `--group exchange` pinpoints
 the turn rather than the conversation.
@@ -64,11 +68,15 @@ the turn rather than the conversation.
 
 ```json
 {
-  "score": 22.65, "coverage": 1, "chunks": 160,
-  "title": "cluster-setup", "session": "a1b2c3d4-...", "project": "-home-me-infra",
-  "cwd": "/home/me/infra", "branch": "main",
-  "when": "2026-07-28T06:26:...", "prompt": "registry mirror not picked up by containerd",
-  "field": "tool", "snippet": "...", "resume": "claude --resume a1b2c3d4-..."
+  "total": 8,
+  "hits": [{
+    "score": 22.65, "coverage": 1, "chunks": 160, "turns": 14,
+    "title": "cluster-setup", "session": "a1b2c3d4-...", "project": "-home-me-infra",
+    "cwd": "/home/me/infra", "branch": "main",
+    "when": "2026-07-28T06:26:...", "prompt": "registry mirror not picked up by containerd",
+    "opening": "bringing up a fresh single-node cluster on 10.0.0.4",
+    "field": "tool", "snippet": "...", "resume": "claude --resume a1b2c3d4-..."
+  }]
 }
 ```
 
@@ -80,14 +88,46 @@ the turn rather than the conversation.
   was found somewhere in that session; a low value means a partial match.
 - `field` says where the match landed. `prompt` or `answer` means it was
   discussed; `tool` or `output` means it appeared in a command or its output.
+- `opening` is the turn the session *started* from - the cheapest one-line
+  description of what it was about. Null when it is the matching turn itself.
+- `turns` is how many user turns the session has: a 40-turn session is a project,
+  a 2-turn one is a question.
 - `resume` is the exact command to jump back in.
+- `total` (top level) is how many sessions matched, which is usually more than
+  `--limit` returned.
 
 ## Answering
 
 Lead with the session that answers the question, quote the snippet that proves
-it, and give the `resume` command. Two or three hits is usually enough - do not
-paste the whole result set. If `coverage` is well below 1 on every hit, say the
-match is weak instead of presenting a guess as an answer.
+it, and give the `resume` command. Detail the best two or three hits.
+
+**Never leave the rest invisible.** After the detailed ones, list every remaining
+hit on one line each - `title, date, one clause of what it was` - and if `total`
+is larger than the hits you got, say so in as many words: *"ещё N сессий не
+показаны"*. A user who sees "8 sessions matched" and gets 3 has no way to know
+what is behind the other 5. When they ask for all of them, re-run with
+`--limit <total>` rather than guessing.
+
+If `coverage` is well below 1 on every hit, say the match is weak instead of
+presenting a guess as an answer.
+
+## Letting the user pick
+
+When two to four hits are all plausible and the user's next move is obviously
+"open that one", offer the choice with `AskUserQuestion` instead of a wall of
+text: one option per session, the label being its title, the description being
+date, project, and its `opening` turn. Add a *"show all N"* option whenever
+`total` exceeds what is on offer, since the picker takes at most four.
+
+Whatever they pick, run `show <id> --json` and answer from that: what the session
+covered, in order, and where the thing they asked about sits in it. Also give the
+`resume` command.
+
+Be straight about the limit: **you cannot switch the active session for them.**
+`claude --resume` starts a separate run; there is no way for a skill to move this
+conversation into another one. What picking does is pull that session's content
+into the current conversation, which keeps the work in progress here. Offer the
+`resume` line for when they want the real jump.
 
 ## Notes
 

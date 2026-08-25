@@ -498,9 +498,18 @@ function search(query, opts = {}) {
     });
   }
 
+  // The turn a session opened with is the cheapest honest description of it:
+  // exchanges are pushed in file order, so the first one per session is it.
+  const firstOf = new Map();
+  for (let i = 0; i < idx.exchanges.length; i++) {
+    const si = idx.exchanges[i].si;
+    if (!firstOf.has(si)) firstOf.set(si, idx.exchanges[i]);
+  }
+
   const hits = groups.slice(0, limit).map((g) => {
     const x = idx.exchanges[g.xi];
     const s = sessOf(g);
+    const open = firstOf.get(g.si ?? idx.exchanges[g.xi].si);
     const doc = readDoc(idx, g.best.id);
     return {
       score: +g.score.toFixed(2),
@@ -516,10 +525,12 @@ function search(query, opts = {}) {
       field: FIELDS[idx.dfld[g.best.id]],
       sidechain: !!doc.sc,
       snippet: snippet(doc.t, full),
+      opening: open && open.t !== x.t ? open.t : null,
+      turns: s.n || null,
       resume: `claude --resume ${s.id}`,
     };
   });
-  return { terms: full, group, hits, docsScored: scores.size,
+  return { terms: full, group, hits, total: groups.length, docsScored: scores.size,
            exchangesScored: byX.size, sessionsScored: new Set(xRanked.map((g) => idx.exchanges[g.xi].si)).size };
 }
 
@@ -595,7 +606,9 @@ function human(res) {
     return;
   }
   const width = Math.min(Math.max(process.stdout.columns || 88, 60), 100);
-  const total = res.group === 'session' ? res.sessionsScored : res.exchangesScored;
+  // res.total is the count after filters, so it never promises a session the
+  // caller cannot actually reach (the current session is excluded by default).
+  const total = res.total ?? (res.group === 'session' ? res.sessionsScored : res.exchangesScored);
   const unit = res.group === 'session' ? 'session' : 'turn';
   console.log(res.hits.length < total
     ? `best ${res.hits.length} of ${total} matching ${unit}s:\n`
@@ -616,10 +629,13 @@ function human(res) {
     console.log(`   ${meta.join('  ')}`);
     console.log(`   score ${h.score}, ${cov}`);
     if (h.prompt) console.log(wrap(`you asked: "${h.prompt}"`, width - 3, '   '));
+    if (h.opening) console.log(wrap(`session began: "${h.opening}"`, width - 3, '   '));
     console.log(`   matched in ${FIELD_LABEL[h.field] || h.field}:`);
     console.log(wrap(h.snippet, width - 5, '     '));
     console.log(`   resume it: ${h.resume}\n`);
   }
+  const more = (res.total || res.hits.length) - res.hits.length;
+  if (more > 0) console.log(`${more} more matched but were not shown - re-run with --limit ${res.total}`);
 }
 
 const args = parseArgs(process.argv.slice(2));
@@ -639,6 +655,45 @@ if (cmd === 'index') {
     docsMb: +(fs.statSync(DOCS).size / 1048576).toFixed(2),
     titled: idx.sessions.filter((s) => s.title).length,
   }, null, 2));
+} else if (cmd === 'show') {
+  // Reading one session's shape without opening the transcript: what it started
+  // from, every turn in order, so a picked search hit can be understood in place.
+  const want = args._[1];
+  if (!want) { console.error('usage: ccfind.mjs show <session-id> [--turns N] [--json]'); process.exit(1); }
+  const idx = readIndex();
+  if (!idx) { console.error('no index - run: ccfind.mjs index'); process.exit(1); }
+  const si = idx.sessions.findIndex((x) => x.id.startsWith(want));
+  if (si === -1) { console.error(`ccfind: no session starting with ${want}`); process.exit(1); }
+  const ses = idx.sessions[si];
+  const turns = idx.exchanges
+    .map((x, i) => ({ ...x, i }))
+    .filter((x) => x.si === si && x.t && x.t !== '(session start)');
+  const cap = args.turns ? +args.turns : 40;
+  const shown = turns.slice(0, cap);
+  if (args.json) {
+    console.log(JSON.stringify({
+      session: ses.id, title: ses.title, project: ses.project, cwd: ses.cwd,
+      branch: ses.branch, first: ses.first, last: ses.last, turns: turns.length,
+      shown: shown.map((x) => ({ when: x.ts, prompt: x.t })),
+      resume: `claude --resume ${ses.id}`,
+    }, null, 2));
+  } else {
+    const width = Math.min(Math.max(process.stdout.columns || 88, 60), 100);
+    const day = (t) => (t ? t.slice(0, 16).replace('T', ' ') : '?');
+    console.log(`${ses.title || ses.project}`);
+    console.log(`${day(ses.first)} to ${day(ses.last)}  ${shortPath(ses.cwd) || ses.project}` +
+                `${ses.branch ? '  ' + ses.branch : ''}  ${turns.length} turn${turns.length === 1 ? '' : 's'}`);
+    console.log(`resume it: claude --resume ${ses.id}\n`);
+    console.log('what you asked, in order:');
+    let n = 0;
+    for (const x of shown) {
+      n++;
+      console.log(wrap(`${String(n).padStart(2)}. ${day(x.ts).slice(11) || '  '}  ${x.t}`, width - 4, '  '));
+    }
+    if (turns.length > shown.length) {
+      console.log(`\n${turns.length - shown.length} more turns - re-run with --turns ${turns.length}`);
+    }
+  }
 } else if (cmd === 'bench') {
   const queries = args._.slice(1);
   if (!queries.length) { console.error('bench needs queries'); process.exit(1); }
