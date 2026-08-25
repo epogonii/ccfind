@@ -216,11 +216,16 @@ binary. One command fixes that, no alias to write:
 node "$CLAUDE_PLUGIN_ROOT/skills/ccfind/scripts/ccfind.mjs" install
 ```
 
-It symlinks itself into the first writable directory already on your PATH
-(`~/.local/bin`, `~/bin`, `/usr/local/bin`, or `$CCFIND_BIN_DIR`), tells you which
-one, and prints the `export PATH` line if that directory turns out not to be on
-it. Because it is a symlink, plugin updates need nothing redone. `uninstall`
-removes it.
+It writes a small launcher into the first writable directory already on your PATH
+(`~/.local/bin`, `~/bin`, `/usr/local/bin`, or `$CCFIND_BIN_DIR` - which wins if
+set), tells you which one, and prints the `export PATH` line if that directory
+turns out not to be on it. Nothing else on the system is touched.
+
+The launcher looks up the installed plugin version each time it runs, so
+`claude plugin update` needs nothing redone - a plain symlink would not survive
+it, because Claude Code unpacks every version into its own
+`~/.claude/plugins/cache/<marketplace>/ccfind/<version>/` directory. `uninstall`
+removes the launcher, and refuses to touch a file it did not write.
 
 `pick` is the one that answers "let me choose it and open it": up and down move,
 Enter hands the terminal to `claude --resume` for the highlighted session, `q`

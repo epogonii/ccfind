@@ -14,8 +14,9 @@ node "$CLAUDE_PLUGIN_ROOT/skills/ccfind/scripts/ccfind.mjs" search "$ARGUMENTS" 
 ```
 
 Answer with a markdown table, one row per hit: `#`, session title, MM-DD,
-project, 8-char id in backticks, turn count, and the shortest verbatim fragment
-that proves the match. Headers in the user's language. List **every** hit the
+project, 8-char id in backticks, how many turns the user wrote in it, and the shortest verbatim
+fragment that proves the match. Headers in English unless the user writes in
+another language - then translate them, never transliterate. List **every** hit the
 search returned, not the best three; if `total` is higher, say how many are
 unshown on its own line. Then a bold recommendation line with one clause of why,
 and its `claude --resume` command alone in a fenced `bash` block. Do not read

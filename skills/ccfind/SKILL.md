@@ -24,7 +24,7 @@ node <skill-dir>/scripts/ccfind.mjs show <session-id> --json      # one session'
 `pick "<query>"` also exists: an arrow-key list that runs `claude --resume` on
 Enter. It needs a real terminal, so **never run it yourself** - a tool call has no
 tty and it would just print the list. Suggest it to the user instead, and if they
-have no `ccfind` command yet, `install` symlinks one onto their PATH (`uninstall`
+have no `ccfind` command yet, `install` puts one on their PATH (`uninstall`
 undoes it). Run `install` only when the user asks for a terminal command; it
 writes outside the plugin directory.
 
@@ -109,14 +109,18 @@ the turn rather than the conversation.
 Terse, and legible in a terminal. The question is *which session*.
 
 A markdown table, one row per hit. The headers are what makes it readable - a
-bare column of numbers leaves the user guessing what `169t` was. Header names go
-in the user's language.
+bare column of numbers leaves the user guessing what `169` meant.
 
-| # | Сессия | Дата | Проект | id | Тёрнов | Совпало |
+| # | Session | Date | Project | id | Asked | Matched |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | registry mirror | 08-06 | infra | `a1b2c3d4` | 169 | "перенеси конфиг реестра" |
-| 2 | новый кластер | 08-06 | infra | `b2c3d4e5` | 6 | "secret-backend staging ..." |
+| 1 | registry mirror | 08-06 | infra | `a1b2c3d4` | 169 | "move the mirror config over" |
+| 2 | node bootstrap | 08-06 | infra | `b2c3d4e5` | 6 | "secret-backend staging ..." |
 | 3 | secret sync | 08-05 | infra | `c3d4e5f6` | 30 | "'API_TOKEN', 'BROKER_URL..." |
+
+`Asked` is the `turns` field: how many times the user wrote into that session.
+Translate the headers when answering in another language, and translate them -
+never transliterate. A word like `Тёрнов` is not a word in the user's language
+and tells them nothing; `Вопросов` does.
 
 Rules:
 
@@ -146,8 +150,11 @@ Rules:
 - report `total` as it comes back. If you narrow it further yourself - only the
   `coverage: 1` hits, only one project - give both numbers (`8 of 23 with every
   word`), because a bare "8 sessions" hides the 15 the user never learns about.
-- match the user's language, and whatever output style the session is running. A
-  terse style stays terse here too - the table stays a table either way.
+- **English by default.** Switch language only when the user's own messages are
+  in another one, and then answer wholly in theirs - headers included. The
+  Russian examples elsewhere in this file are illustrations, not the default.
+- keep whatever output style the session is running. A terse style stays terse
+  here too - the table stays a table either way.
 - if `coverage` is well below 1 on every hit, one line saying the match is weak
   beats a confident guess.
 
