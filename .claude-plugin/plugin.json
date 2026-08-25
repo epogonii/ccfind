@@ -4,7 +4,7 @@
   "description": "Full-text search across your past Claude Code sessions. Indexes local transcripts and ranks results with BM25, so you can find the conversation where something was actually discussed and jump back into it.",
   "version": "0.15.4",
   "author": {
-    "name": "Evgheni Pogonii"
+    "name": "Evghenii Pogonii"
   },
   "homepage": "https://github.com/epogonii/ccfind",
   "repository": "https://github.com/epogonii/ccfind",
