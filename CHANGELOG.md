@@ -3,6 +3,32 @@
 All versions are dated 2026-08-25: the project went from first commit to the
 plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.15.0
+
+- Fixed: `open` had no way to open a window on a current GNOME desktop. The
+  emulator list predated ptyxis (GNOME's terminal since Fedora 41) and GNOME
+  Console, so a box with either and nothing else fell through every candidate
+  and printed the fallback. It now asks `xdg-terminal-exec` first - the
+  freedesktop dispatcher, which honours whichever terminal the user chose - and
+  knows ptyxis, kgx, foot, terminator and xfce4-terminal.
+- Fixed: `open` blocked for as long as the window it opened stayed open. A
+  foreground terminal (kitty, foot, xterm) *is* the window and does not exit
+  while it is up, and `open` runs from inside a tool call, which hung with it.
+  The launch is asynchronous now and lets go of the terminal it started.
+- Fixed: `open` counted a terminal killed by a signal as a window that opened,
+  and reported success with nothing on screen.
+- Fixed: a non-numeric or negative `--days` silently either dropped the filter
+  (`--days abc`) or matched nothing (`--days -3`). Both now mean no date filter
+  and say so on stderr, so `--json` output stays clean. A fractional window
+  (`--days 0.5` for the last twelve hours) still filters.
+- Indexing no longer rescans the whole exchange list once per transcript, which
+  was quadratic in the size of the corpus: 1500 sessions and 21 000 exchanges
+  went from 3.9 s to 2.9 s, for a byte-identical index.
+- Tests: `node test/run.mjs` builds its own corpus in a temporary directory and
+  covers indexing, search, every filter, the relevance gate, `show`, `pick` and
+  all four outcomes of a terminal launch. It never reads or writes a real
+  `~/.claude`. GitHub Actions runs it on Node 18, 20 and 22, Linux and macOS.
+
 ## 0.14.2
 
 - Fixed: `--self` no longer discards an explicit `--exclude` list; it only

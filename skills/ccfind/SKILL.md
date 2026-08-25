@@ -212,7 +212,8 @@ node <skill-dir>/scripts/ccfind.mjs open <session-id>
 
 `open` launches a new terminal window on that session (`claude --resume`, in the
 session's own cwd - tmux window if they are in tmux, iTerm/Terminal on macOS, the
-installed emulator on Linux).
+installed emulator on Linux). It returns as soon as the window is up, so it never
+holds the tool call open for the life of that window.
 
 **Run it immediately after the pick, without asking.** Not "shall I open a window
 on it?" - picking a session *is* the request to open it, and asking costs the

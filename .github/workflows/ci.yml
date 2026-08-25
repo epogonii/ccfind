@@ -1,0 +1,60 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: ['18', '20', '22']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # The README promises Node 18+ and no build step, so parsing every script
+      # under the oldest supported runtime is part of the contract.
+      - name: parse every script
+        run: |
+          for f in skills/ccfind/scripts/ccfind.mjs test/run.mjs docs/demo/gen.mjs docs/demo/filler.mjs; do
+            node --check "$f"
+          done
+
+      # Builds its own corpus in a temp directory and points CCFIND_CONFIG_DIR at
+      # it, so nothing here reads or writes a real ~/.claude.
+      - name: end-to-end tests
+        run: node test/run.mjs
+
+  manifest:
+    name: plugin manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: the manifests parse and agree with each other
+        run: |
+          node -e '
+            const fs = require("fs");
+            const plugin = JSON.parse(fs.readFileSync(".claude-plugin/plugin.json", "utf8"));
+            const market = JSON.parse(fs.readFileSync(".claude-plugin/marketplace.json", "utf8"));
+            const entry = market.plugins.find((p) => p.name === plugin.name);
+            if (!entry) throw new Error(`marketplace.json has no entry for ${plugin.name}`);
+            if (!/^\d+\.\d+\.\d+$/.test(plugin.version)) throw new Error(`version is not semver: ${plugin.version}`);
+            for (const k of ["name", "description", "version", "author", "license"]) {
+              if (!plugin[k]) throw new Error(`plugin.json is missing ${k}`);
+            }
+            const skill = fs.readFileSync("skills/ccfind/SKILL.md", "utf8");
+            if (!skill.startsWith("---\n")) throw new Error("SKILL.md has no frontmatter");
+            const changelog = fs.readFileSync("CHANGELOG.md", "utf8");
+            if (!changelog.includes(`## ${plugin.version}`)) {
+              throw new Error(`CHANGELOG.md has no section for ${plugin.version}`);
+            }
+            console.log(`ccfind ${plugin.version}: manifests agree`);
+          '

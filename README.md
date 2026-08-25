@@ -17,6 +17,7 @@
   <img alt="network" src="https://img.shields.io/badge/network-none-brightgreen">
   <img alt="runtime" src="https://img.shields.io/badge/node-%E2%89%A518-informational">
   <img alt="P@1" src="https://img.shields.io/badge/P%401-0.92-success">
+  <a href="https://github.com/epogonii/ccfind/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/epogonii/ccfind/actions/workflows/ci.yml/badge.svg"></a>
 </p>
 
 ---
@@ -263,10 +264,19 @@ removes the launcher, and refuses to touch a file it did not write.
 
 `open <id>` launches a new terminal window on one session - `claude --resume` in
 that session's own working directory. It uses your multiplexer or terminal, in
-this order: a `tmux` window if `$TMUX` is set, iTerm or Terminal on macOS,
-`$TERMINAL` / `x-terminal-emulator` / gnome-terminal / konsole / kitty / wezterm
-/ alacritty / xterm on Linux. `CCFIND_OPEN_DRYRUN=1` prints what it would run.
-If none of them work it falls back to telling you the `/resume` line.
+this order: a `tmux` window if `$TMUX` is set, iTerm or Terminal on macOS, and on
+Linux `$TERMINAL`, then `xdg-terminal-exec` - the freedesktop dispatcher, which
+honours whichever terminal you actually chose - then `x-terminal-emulator`,
+ptyxis, kgx, gnome-terminal, konsole, foot, kitty, wezterm, alacritty,
+terminator, xfce4-terminal, xterm. `CCFIND_OPEN_DRYRUN=1` prints what it would
+run without running it. If none of them work it falls back to telling you the
+`/resume` line.
+
+A terminal that hands the request to an already-running instance exits straight
+away; a foreground one *is* the window and stays alive until you close it. So
+`open` waits only long enough to tell a failed launch from a live window
+(`CCFIND_OPEN_GRACE_MS`, 700 ms by default) and then lets go, which is why it
+returns immediately even when called from inside a session.
 
 Inside a Claude Code session, `/resume <id>` is the other half: that built-in
 slash command switches the window you type it in, rather than opening a second
@@ -298,6 +308,20 @@ conversation: nothing can switch the active session from inside it.
 Worth knowing: `--field prompt` finds where **you** raised something,
 `--field output` finds what a command actually printed, and `--group exchange`
 pinpoints the turn instead of the session.
+
+## Tests
+
+```bash
+node test/run.mjs
+```
+
+End-to-end checks over indexing, search, every filter, the relevance gate,
+`show`, `pick` and all four ways a terminal launch can end. The suite builds its
+own corpus in a temporary directory and points `CCFIND_CONFIG_DIR` at it, so it
+never reads or writes a real `~/.claude`, and the terminal launches go to stub
+scripts on an otherwise empty `PATH`, so no window ever opens. No dependencies,
+no network, nothing to install. CI runs it on Node 18, 20 and 22, Linux and
+macOS.
 
 ## Storage
 

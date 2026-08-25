@@ -8,7 +8,7 @@ import path from 'node:path';
 import os from 'node:os';
 import readline from 'node:readline';
 import zlib from 'node:zlib';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const HOME = os.homedir();
@@ -284,6 +284,11 @@ async function buildIndex({ full = false, quiet = false } = {}) {
     sessionIdx.set(sid, si);
     sessions.push({ id: sid, title: null, project, cwd: null, branch: null, first: null, last: null, n: 0 });
 
+    // Every exchange this file pushes carries this file's si, and exchanges is
+    // append-only, so the file's own slice is exactly [x0, exchanges.length).
+    // That turns "which exchanges belong to this session" from a scan of the
+    // whole array per file into two integers.
+    const x0 = exchanges.length;
     let xi = -1;
     let sawPrompt = false;
 
@@ -329,14 +334,14 @@ async function buildIndex({ full = false, quiet = false } = {}) {
     // Index the title against the session's first exchange so a search for the
     // topic finds the session even when the wording only exists in the title.
     if (sessions[si].title) {
-      let xt = exchanges.findIndex((x) => x.si === si);
+      let xt = exchanges.length > x0 ? x0 : -1;
       if (xt === -1) {
         exchanges.push({ si, t: sessions[si].title, ts: sessions[si].first, n: 0 });
         xt = exchanges.length - 1;
       }
       pushDoc(xt, 'title', sessions[si].title, sessions[si].first, false);
     }
-    sessions[si].n = exchanges.filter((x) => x.si === si).length;
+    sessions[si].n = exchanges.length - x0;
   }
   fs.closeSync(docsFd);
 
@@ -619,6 +624,14 @@ function posInt(v, dflt) {
   return Number.isFinite(n) && n > 0 ? n : dflt;
 }
 
+// Same idea for a window of days, except fractions are meaningful: --days 0.5
+// is the last twelve hours. Not posInt, which would floor that to 0 and quietly
+// drop the filter the user asked for.
+function posNum(v, dflt) {
+  const n = +v;
+  return Number.isFinite(n) && n > 0 ? n : dflt;
+}
+
 // Plain-text output is what a first-time reader sees, so it spells things out:
 // where the session lived, the words the user themselves used, and which part of
 // the conversation the match landed in. --json carries the raw numbers.
@@ -864,12 +877,23 @@ await import(pathToFileURL(target).href);
         : `tell application "Terminal" to do script ${JSON.stringify(inner)}`;
       return [['osascript', ['-e', script]], ['osascript', ['-e', `tell application "Terminal" to do script ${JSON.stringify(inner)}`]]];
     }
-    const linux = [['x-terminal-emulator', ['-e', 'sh', '-lc', inner]],
+    // xdg-terminal-exec first: it is the freedesktop dispatcher and honours the
+    // terminal the user actually chose, which no hard-coded list can know. The
+    // rest are the emulators that ship as a desktop's default, newest first -
+    // ptyxis is GNOME's since Fedora 41, kgx (GNOME Console) before that, and a
+    // box with neither still has gnome-terminal.
+    const linux = [['xdg-terminal-exec', ['sh', '-lc', inner]],
+                   ['x-terminal-emulator', ['-e', 'sh', '-lc', inner]],
+                   ['ptyxis', ['--', 'sh', '-lc', inner]],
+                   ['kgx', ['--', 'sh', '-lc', inner]],
                    ['gnome-terminal', ['--', 'sh', '-lc', inner]],
                    ['konsole', ['-e', 'sh', '-lc', inner]],
+                   ['foot', ['sh', '-lc', inner]],
                    ['kitty', ['sh', '-lc', inner]],
                    ['wezterm', ['start', '--', 'sh', '-lc', inner]],
                    ['alacritty', ['-e', 'sh', '-lc', inner]],
+                   ['terminator', ['-x', 'sh', '-lc', inner]],
+                   ['xfce4-terminal', ['-x', 'sh', '-lc', inner]],
                    ['xterm', ['-e', 'sh', '-lc', inner]]];
     return process.env.TERMINAL ? [[process.env.TERMINAL, ['-e', 'sh', '-lc', inner]], ...linux] : linux;
   };
@@ -881,10 +905,32 @@ await import(pathToFileURL(target).href);
   // `osascript` is the tool, not the thing the user sees - name the app.
   const label = (c) => (c !== 'osascript' ? c
     : process.env.TERM_PROGRAM === 'iTerm.app' ? 'iTerm' : 'Terminal');
+  // Two shapes of terminal, and the difference matters here. A client-server
+  // one (ptyxis, gnome-terminal, kgx) hands the request to its already-running
+  // instance and exits 0 in a few hundred ms. A foreground one (kitty, foot,
+  // xterm) *is* the window: it does not exit while the window is open. So
+  // spawnSync would block this process for as long as the user keeps the window
+  // around - and `open` is run from inside a tool call, which would hang with
+  // it. Asynchronous instead, with three outcomes: an early exit 0 means the
+  // window is up, an early non-zero exit or a spawn error means try the next
+  // candidate, and still running after the grace period means it is a
+  // foreground terminal that opened fine, so let go of it and stop.
+  const GRACE_MS = posInt(process.env.CCFIND_OPEN_GRACE_MS, 700);
+  const launch = (c, a) => new Promise((resolve) => {
+    let child;
+    try { child = spawn(c, a, { stdio: 'ignore', detached: true }); }
+    catch { resolve(false); return; }
+    let settled = false;
+    const done = (ok) => { if (!settled) { settled = true; clearTimeout(timer); resolve(ok); } };
+    // unref so this process can exit while the terminal it opened keeps running.
+    const timer = setTimeout(() => { child.unref(); done(true); }, GRACE_MS);
+    child.on('error', () => done(false));
+    // A null code means killed by a signal, which is not an opened window.
+    child.on('exit', (code) => done(code === 0));
+  });
   let opened = null;
   for (const [c, a] of emulators()) {
-    const r = spawnSync(c, a, { stdio: 'ignore' });
-    if (!r.error && (r.status === 0 || r.status === null)) { opened = c; break; }
+    if (await launch(c, a)) { opened = c; break; }
   }
   if (opened) {
     console.log(`opened ${ses.title || ses.id.slice(0, 8)} in a new ${label(opened)} window`);
@@ -1043,6 +1089,13 @@ await import(pathToFileURL(target).href);
     console.error('                              [--exclude ID[,ID...]] [--self] [--all] [--json]');
     process.exit(1);
   }
+  // A garbled --days used to disable the filter silently (NaN is falsy) and a
+  // negative one silently matched nothing. Both now mean "no date filter", and
+  // say so on stderr so stdout stays clean JSON.
+  const days = posNum(args.days, null);
+  if (args.days !== undefined && days === null) {
+    console.error(`ccfind: ignoring --days ${args.days} - not a positive number of days`);
+  }
   let res;
   try {
     res = search(q, {
@@ -1060,7 +1113,7 @@ await import(pathToFileURL(target).href);
                 ...(args.self ? [] : [process.env.CLAUDE_CODE_SESSION_ID || null,
                                       process.env.CLAUDE_SESSION_ID || null])]
                .map((s) => s && s.trim()).filter(Boolean),
-      days: args.days ? +args.days : null,
+      days,
       // Everything BM25 scored, gate and all. For "did I ever mention X at all",
       // where a single passing reference is the answer.
       all: !!args.all,
