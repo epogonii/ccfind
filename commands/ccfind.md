@@ -19,7 +19,9 @@ fragment that proves the match. Headers in English unless the user writes in
 another language - then translate them, never transliterate. List **every** hit the
 search returned, not the best three; if `total` is higher, say how many are
 unshown on its own line. Then a bold recommendation line with one clause of why,
-and its `claude --resume` command alone in a fenced `bash` block. Do not read
+and the hit's `open` field (`/resume <id>`) on its own line - typed in this
+window that slash command switches to the session, which is what "open it"
+means. Do not read
 any `*.jsonl` files directly.
 
 Then offer the top three through `AskUserQuestion` plus a "show all N" option,

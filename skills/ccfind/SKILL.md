@@ -100,7 +100,8 @@ the turn rather than the conversation.
   description of what it was about. Null when it is the matching turn itself.
 - `turns` is how many user turns the session has: a 40-turn session is a project,
   a 2-turn one is a question.
-- `resume` is the exact command to jump back in.
+- `open` is `/resume <id>` - typed in this window it switches to that session in
+  place. `resume` is `claude --resume <id>`, which starts a separate run instead.
 - `total` (top level) is how many sessions matched, which is usually more than
   `--limit` returned.
 
@@ -137,15 +138,16 @@ Rules:
   line the user acts on, so it must not read as a footnote to the table:
 
   ```
-  **Смотреть здесь: secret sync** - где синк наконец починили
+  **Open this one: secret sync** - where the sync was actually fixed
 
-  ```bash
-  claude --resume c3d4e5f6-7a8b-4c9d-8e0f-112233445566
-  ```
+  /resume c3d4e5f6-7a8b-4c9d-8e0f-112233445566
   ```
 
-  Bold label, one clause of why, then the resume command alone in a fenced
-  `bash` block so it is copyable in one gesture.
+  Bold label, one clause of why, then the session's `open` field on its own
+  line. `/resume <id>` is a built-in slash command: typed in this window it
+  switches to that session in place. That is what the user means by "open it",
+  so it is the line that must be easy to find. `claude --resume` (the `resume`
+  field) is the terminal variant - mention it only if they are in a terminal.
 - the withheld count goes on its own plain line when `total` exceeds the rows.
 - report `total` as it comes back. If you narrow it further yourself - only the
   `coverage: 1` hits, only one project - give both numbers (`8 of 23 with every
@@ -180,10 +182,10 @@ session concluded about the thing they asked, and where in it that sits. Then
 they can keep asking about it here, which is the point: the session's content is
 now in this conversation.
 
-Be straight about the limit: **you cannot switch the active session for them.**
-`claude --resume` starts a separate run, and no skill can move this conversation
-into another one. Picking pulls that session's content in here, which keeps the
-work in progress. Arrow keys over *every* hit, with Enter that really hands the
+Then, always, the last line: **`/resume <id>`** for the session they picked.
+A skill cannot type it for them - no tool switches the active session - but that
+one line does, in this same window, and it is what "open it" means. So: pull the
+content in here *and* hand them the line. Never end a pick without it. Arrow keys over *every* hit, with Enter that really hands the
 terminal to `claude --resume`, exist in one place only: `ccfind pick "<query>"`
 in a terminal. Recommend it when the list is long.
 

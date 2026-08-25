@@ -78,7 +78,8 @@ Inside Claude Code, ask for it by name:
 Or don't. The skill fires on its own when you say things like *"where did we
 already fix this"*, *"which session was that"*, *"we did this before"*, *"search
 my history"*, *"поищи в прошлых сессиях"*. Either way you get the answer in the
-chat, and the `claude --resume <id>` line for the session it came from - so you
+chat, and `/resume <id>` for the session it came from - typed in that same
+window, the built-in slash command switches you into it, so you
 can keep reading with the whole original context, not a summary of it.
 
 The GIF above is the same search run as a plain command; you can drive it that way

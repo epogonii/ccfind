@@ -529,6 +529,11 @@ function search(query, opts = {}) {
       snippet: snippet(doc.t, full),
       opening: open && open.t !== x.t ? open.t : null,
       turns: s.n || null,
+      // Two different things, and the difference is the whole point: `/resume`
+      // is a built-in slash command (argumentHint "[conversation id or search
+      // term]") that switches this window to that session, while
+      // `claude --resume` starts a separate run in a terminal.
+      open: `/resume ${s.id}`,
       resume: `claude --resume ${s.id}`,
     };
   });
@@ -634,7 +639,7 @@ function human(res) {
     if (h.opening) console.log(wrap(`session began: "${h.opening}"`, width - 3, '   '));
     console.log(`   matched in ${FIELD_LABEL[h.field] || h.field}:`);
     console.log(wrap(h.snippet, width - 5, '     '));
-    console.log(`   resume it: ${h.resume}\n`);
+    console.log(`   open it:   ${h.open}${process.env.CLAUDECODE ? '' : `   (in a terminal: ${h.resume})`}\n`);
   }
   const more = (res.total || res.hits.length) - res.hits.length;
   if (more > 0) console.log(`${more} more matched but were not shown - re-run with --limit ${res.total}`);
@@ -677,6 +682,7 @@ if (cmd === 'index') {
       session: ses.id, title: ses.title, project: ses.project, cwd: ses.cwd,
       branch: ses.branch, first: ses.first, last: ses.last, turns: turns.length,
       shown: shown.map((x) => ({ when: x.ts, prompt: x.t })),
+      open: `/resume ${ses.id}`,
       resume: `claude --resume ${ses.id}`,
     }, null, 2));
   } else {
@@ -685,7 +691,7 @@ if (cmd === 'index') {
     console.log(`${ses.title || ses.project}`);
     console.log(`${day(ses.first)} to ${day(ses.last)}  ${shortPath(ses.cwd) || ses.project}` +
                 `${ses.branch ? '  ' + ses.branch : ''}  ${turns.length} turn${turns.length === 1 ? '' : 's'}`);
-    console.log(`resume it: claude --resume ${ses.id}\n`);
+    console.log(`open it: /resume ${ses.id}   (in a terminal: claude --resume ${ses.id})\n`);
     console.log('what you asked, in order:');
     let n = 0;
     for (const x of shown) {
