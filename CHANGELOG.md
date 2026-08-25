@@ -3,6 +3,20 @@
 All versions are dated 2026-08-25: the project went from first commit to the
 plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.15.3
+
+- Fixed a regression in 0.15.2 that only showed on macOS. The `; exit $?` added to
+  keep a shell above the resumed session went onto the command for every platform,
+  and on macOS that command is not run by a shell we spawn - `do script` types it
+  into a new window's *interactive* shell, which normally stays at a prompt once
+  `claude` quits. Exiting it would have closed that window instead, losing the
+  shell the user was left with. macOS never needed the guard anyway: `claude` is
+  already a child of that interactive shell, which is exactly what Terminal and
+  iTerm look for when they warn about closing a window. The trailing builtin now
+  goes only to the Linux emulator ladder, and tmux is left out too, since
+  `kill-window` never asks. Verified by forcing the platform: the macOS and tmux
+  command lines are byte-identical to 0.15.1's.
+
 ## 0.15.2
 
 - Fixed: closing a window that `open` had launched killed the session without the

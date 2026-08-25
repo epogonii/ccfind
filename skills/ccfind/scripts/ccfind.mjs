@@ -884,15 +884,22 @@ await import(pathToFileURL(target).href);
   const ses = idx.sessions.find((x) => x.id.startsWith(want));
   if (!ses) { console.error(`ccfind: no session starting with ${want}`); process.exit(1); }
   const cwd = ses.cwd && fs.existsSync(ses.cwd) ? ses.cwd : HOME;
-  // The trailing `exit $?` is not redundant. A shell handed `-c` replaces itself
-  // with the last command rather than forking it, so without it `claude` *becomes*
-  // the terminal's own process. Emulators that offer to confirm closing a window -
-  // ptyxis, gnome-terminal, konsole - decide that by looking for a child process
-  // still running: they find none, and the first click on the close button kills
-  // the resumed session with no prompt, while every other window of the same
-  // terminal asks. Keeping the shell alive puts `claude` back where those
-  // emulators look, and the exit status still comes from `claude`.
-  const inner = `cd ${JSON.stringify(cwd)} && claude --resume ${ses.id}; exit $?`;
+  const inner = `cd ${JSON.stringify(cwd)} && claude --resume ${ses.id}`;
+  // The same command with the shell kept above it, for the Linux emulators only.
+  // A shell handed `-c` replaces itself with the last command rather than forking
+  // it, so plain `inner` makes `claude` the terminal's own process. Emulators that
+  // offer to confirm closing a window - ptyxis, gnome-terminal, konsole - decide
+  // that by looking for a child process still running: they find none, and the
+  // first click on the close button ends the resumed session with no prompt, while
+  // every other window of the same terminal asks first. The trailing builtin puts
+  // `claude` back where those emulators look, and the exit status is still its own.
+  //
+  // Not on macOS: there `do script` runs the text in a new window's *interactive*
+  // shell, which stays at a prompt when `claude` exits. `exit` would close that
+  // window instead, which is a loss, and Terminal and iTerm already warn about a
+  // running process because it is a child of that shell already. Not in tmux
+  // either - `kill-window` never asks, so the extra shell would buy nothing.
+  const guiInner = `${inner}; exit $?`;
 
   // Ordered by how little it surprises the user: their own multiplexer first,
   // then the terminal they are actually in, then anything installed.
@@ -910,20 +917,20 @@ await import(pathToFileURL(target).href);
     // rest are the emulators that ship as a desktop's default, newest first -
     // ptyxis is GNOME's since Fedora 41, kgx (GNOME Console) before that, and a
     // box with neither still has gnome-terminal.
-    const linux = [['xdg-terminal-exec', ['sh', '-lc', inner]],
-                   ['x-terminal-emulator', ['-e', 'sh', '-lc', inner]],
-                   ['ptyxis', ['--', 'sh', '-lc', inner]],
-                   ['kgx', ['--', 'sh', '-lc', inner]],
-                   ['gnome-terminal', ['--', 'sh', '-lc', inner]],
-                   ['konsole', ['-e', 'sh', '-lc', inner]],
-                   ['foot', ['sh', '-lc', inner]],
-                   ['kitty', ['sh', '-lc', inner]],
-                   ['wezterm', ['start', '--', 'sh', '-lc', inner]],
-                   ['alacritty', ['-e', 'sh', '-lc', inner]],
-                   ['terminator', ['-x', 'sh', '-lc', inner]],
-                   ['xfce4-terminal', ['-x', 'sh', '-lc', inner]],
-                   ['xterm', ['-e', 'sh', '-lc', inner]]];
-    return process.env.TERMINAL ? [[process.env.TERMINAL, ['-e', 'sh', '-lc', inner]], ...linux] : linux;
+    const linux = [['xdg-terminal-exec', ['sh', '-lc', guiInner]],
+                   ['x-terminal-emulator', ['-e', 'sh', '-lc', guiInner]],
+                   ['ptyxis', ['--', 'sh', '-lc', guiInner]],
+                   ['kgx', ['--', 'sh', '-lc', guiInner]],
+                   ['gnome-terminal', ['--', 'sh', '-lc', guiInner]],
+                   ['konsole', ['-e', 'sh', '-lc', guiInner]],
+                   ['foot', ['sh', '-lc', guiInner]],
+                   ['kitty', ['sh', '-lc', guiInner]],
+                   ['wezterm', ['start', '--', 'sh', '-lc', guiInner]],
+                   ['alacritty', ['-e', 'sh', '-lc', guiInner]],
+                   ['terminator', ['-x', 'sh', '-lc', guiInner]],
+                   ['xfce4-terminal', ['-x', 'sh', '-lc', guiInner]],
+                   ['xterm', ['-e', 'sh', '-lc', guiInner]]];
+    return process.env.TERMINAL ? [[process.env.TERMINAL, ['-e', 'sh', '-lc', guiInner]], ...linux] : linux;
   };
 
   if (process.env.CCFIND_OPEN_DRYRUN) {
