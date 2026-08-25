@@ -899,7 +899,7 @@ await import(pathToFileURL(target).href);
     out += `ccfind: ${res.total} session${res.total === 1 ? '' : 's'} match "${q}"` +
            `${res.total > rows.length ? `, showing ${rows.length}` : ''}` +
            `${rows.length > vp ? `  [${cur + 1}/${rows.length}]` : ''}\n`;
-    out += `${ESC}[2m up/down to move, enter to resume, q to quit${ESC}[0m\n\n`;
+    out += `${ESC}[2m up/down or click to move, enter or second click to resume, q to quit${ESC}[0m\n\n`;
     rows.slice(top, top + vp).forEach((h, k) => {
       const i = top + k;
       const when = h.when ? h.when.slice(0, 10) : '          ';
@@ -925,13 +925,22 @@ await import(pathToFileURL(target).href);
     process.stdout.write(out);
   };
 
+  // Mouse: SGR tracking (1006) on top of normal button tracking (1000), so a
+  // click can select a row and the wheel can scroll. It must be turned back off
+  // on every exit path - left on, it eats the terminal's own text selection.
+  const MOUSE_ON = `${ESC}[?1000h${ESC}[?1006h`, MOUSE_OFF = `${ESC}[?1000l${ESC}[?1006l`;
+  // Rows start on the 4th screen line: header, hint, blank, then the list.
+  const FIRST_ROW = 4;
+
   process.stdin.setRawMode(true);
   process.stdin.resume();
   process.stdin.setEncoding('utf8');
+  process.stdout.write(MOUSE_ON);
+  process.on('exit', () => { try { process.stdout.write(MOUSE_OFF); } catch { /* closed */ } });
   draw();
   const leave = (fn) => {
     process.stdin.setRawMode(false);
-    process.stdout.write(`${ESC}[2J${ESC}[H`);
+    process.stdout.write(`${MOUSE_OFF}${ESC}[2J${ESC}[H`);
     fn();
   };
   // One chunk can carry several keys - held arrows, or a terminal that batches -
@@ -940,6 +949,21 @@ await import(pathToFileURL(target).href);
   process.stdin.on('data', (chunk) => {
     let s = chunk, moved = false;
     while (s.length) {
+      // SGR mouse report: ESC [ < button ; col ; row (M press | m release)
+      const mouse = /^\u001b\[<(\d+);(\d+);(\d+)([Mm])/.exec(s);
+      if (mouse) {
+        const [, btn, , rowStr, kind] = mouse;
+        const b = +btn, row = +rowStr;
+        s = s.slice(mouse[0].length);
+        if (b === 64) { cur = (cur - 1 + rows.length) % rows.length; moved = true; continue; }  // wheel up
+        if (b === 65) { cur = (cur + 1) % rows.length; moved = true; continue; }                // wheel down
+        if (kind !== 'M' || b !== 0) continue;                                                  // release, or not left button
+        const hit = top + (row - FIRST_ROW);
+        if (hit < 0 || hit >= rows.length || row < FIRST_ROW) continue;   // clicked outside the list
+        if (hit === cur) return leave(() => open(rows[cur]));             // click the highlighted row to open it
+        cur = hit; moved = true;
+        continue;
+      }
       const three = s.slice(0, 3);
       if (three === `${ESC}[A` || three === `${ESC}OA`) { cur = (cur - 1 + rows.length) % rows.length; moved = true; s = s.slice(3); continue; }
       if (three === `${ESC}[B` || three === `${ESC}OB`) { cur = (cur + 1) % rows.length; moved = true; s = s.slice(3); continue; }
