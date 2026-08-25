@@ -400,6 +400,14 @@ ok('the launcher exists', fs.existsSync(LINK), BIN);
 ok('the launcher is marked as ours', fs.readFileSync(LINK, 'utf8').includes(MARK), 'no marker');
 ok('the launcher is executable', (fs.statSync(LINK).mode & 0o111) !== 0, fs.statSync(LINK).mode.toString(8));
 
+// The launcher has no .mjs extension, so Node treats it as CommonJS unless it
+// guesses from the syntax - which it only does since 20.19. An `import`
+// statement in there is a SyntaxError on Node 18 and the command is dead. The
+// suite has to assert the source, not just that it ran: on a modern Node the
+// guess hides the bug.
+ok('the launcher is CommonJS, which Node 18 needs',
+  !/^\s*import\s/m.test(fs.readFileSync(LINK, 'utf8')), 'top-level import in the launcher');
+
 // HOME without a plugin registry, so the launcher takes its fallback path and
 // resolves to the script under test rather than to whatever is installed on the
 // machine running the suite.

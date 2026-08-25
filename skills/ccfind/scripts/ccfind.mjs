@@ -808,10 +808,15 @@ if (cmd === 'index') {
 // ${MARK} - do not edit.
 // Resolves the installed plugin version at run time so a plugin update needs
 // no reinstall. Delete it with \`ccfind uninstall\`.
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+//
+// CommonJS on purpose. The file has no .mjs extension, and Node only infers
+// ESM from the syntax itself since 20.19 - on Node 18, which ccfind supports,
+// an import statement here is a SyntaxError and the launcher never runs.
+// require plus a dynamic import() works on every supported version.
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 
 const FALLBACK = ${JSON.stringify(fallback)};
 const REG = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json');
@@ -833,7 +838,12 @@ if (!fs.existsSync(target)) {
   console.error('reinstall the plugin, then run: ccfind install');
   process.exit(1);
 }
-await import(pathToFileURL(target).href);
+// A dynamic import resolves an ES module from CommonJS; top-level await does not
+// exist here, so failures are reported through the rejection instead.
+import(pathToFileURL(target).href).catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
 `;
 
   if (cmd === 'uninstall') {

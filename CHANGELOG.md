@@ -3,6 +3,20 @@
 All versions are dated 2026-08-25: the project went from first commit to the
 plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.16.3
+
+- The generated launcher is CommonJS. It was written with `import` statements
+  and no `.mjs` extension, so Node only accepted it where it guesses the module
+  kind from the syntax - a feature that landed in 20.19. On Node 18, which the
+  skill documents as the floor, `ccfind` died with
+  `SyntaxError: Cannot use import statement outside a module` on every run: the
+  command existed and never worked. It now uses `require` for the three built-ins
+  and a dynamic `import()` for the plugin script, which runs on every supported
+  version. Verified on Node 18 as well as 20 and 22.
+- A test asserts the launcher's source has no top-level `import`. Running the
+  launcher is not enough of a check on a modern Node, where the syntax guess
+  hides exactly this bug - which is how it shipped in the first place. 113 tests.
+
 ## 0.16.2
 
 - `install` names the startup file the user's own shell reads. It printed
