@@ -13,11 +13,12 @@ node "$CLAUDE_PLUGIN_ROOT/skills/ccfind/scripts/ccfind.mjs" index
 node "$CLAUDE_PLUGIN_ROOT/skills/ccfind/scripts/ccfind.mjs" search "$ARGUMENTS" --limit 12 --json
 ```
 
-Report the two or three sessions that actually answer it: title, date, project,
-the user turn it hangs off, the matching snippet, and the `resume` command. Then
-list every other hit on one line each, and if `total` is higher than the hits you
-were given, say how many are still unshown. Do not read any `*.jsonl` files
-directly.
+Answer in one fenced block, one aligned line per hit - number, title, MM-DD,
+project, 8-char session id, turn count, and the shortest verbatim fragment that
+proves the match. List **every** hit the search returned, not the best three; if
+`total` is higher, say how many are still unshown. Outside the block: the full
+`claude --resume` line for the one you recommend. Do not read any `*.jsonl`
+files directly.
 
-If several hits are equally plausible, offer them through `AskUserQuestion` and
-run `show <id> --json` on the one picked.
+Then offer the top three through `AskUserQuestion` plus a "show all N" option,
+and run `show <id> --json` on whichever is picked.

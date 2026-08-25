@@ -106,33 +106,38 @@ the turn rather than the conversation.
 
 ## Answering
 
-Terse. The question is *which session*, not an essay about searching.
+Terse, and legible in a terminal. The question is *which session*.
 
-Default shape - the two or three that answer it, one line each, then the rest as
-one line each, then a count:
+One fenced block, one line per hit, columns aligned. A numbered prose list with
+italic quotes and blockquote pipes wraps into mush at terminal width - that is
+the single biggest thing that makes an answer here unreadable.
 
 ```
-1. Fix NuGet dependency resolution   08-04  acme-api   12.2  e5f6a7b8
-   "падает restore пакетов в CI" -> buildUrl .../job/acme-api/470/
-2. ...
-+ 20 more, weaker: registry mirror 08-10, ansible 07-31, mcp 08-05, ...
+1  secret sync          08-05  acme-dev  c3d4e5f6   14t  секреты по одному, а не пачкой
+2  новый кластер    08-06  acme-dev  b2c3d4e5   31t  карта всех сторов
+3  registry mirror            08-06  acme-dev  a1b2c3d4  927t  перенос конфига реестра
+...
+8  ansible        07-31  infra     d4e5f6a7    6t  secrets.yaml на 10.0.0.4
 ```
 
 Rules:
 
-- no preamble. Not "I ran a search and found" - just the hits.
-- one quoted fragment per hit, the shortest that proves it, verbatim from
-  `snippet`. Never paraphrase a snippet into something the transcript did not say.
-- the first 8 characters of the session id are enough to resume with; print the
-  whole `claude --resume` line only for the one you are recommending.
-- state what is not shown in a clause, not a paragraph: `+ 20 more`. Never let
-  `total` be larger than what you listed without saying so.
+- no preamble. Not "I ran a search and found" - the block first.
+- **list every hit the search returned**, not the best three. `--limit 12` asks
+  for twelve because the user wants the whole field; answering a twelve-hit
+  search with three lines hides nine sessions. Trim the last column, never drop
+  rows.
+- columns, in order: number, title (cut to ~14 chars), MM-DD, project leaf,
+  8-char id, turn count, then the shortest fragment that proves the match.
+- that fragment is verbatim from `snippet`, cut with `...`. Never paraphrase a
+  snippet into something the transcript did not say.
+- outside the block, at most two lines: the one you recommend with its full
+  `claude --resume`, and the withheld count when `total` exceeds the rows.
 - report `total` as it comes back. If you narrow it further yourself - only the
   `coverage: 1` hits, only one project - give both numbers (`8 of 23 with every
   word`), because a bare "8 sessions" hides the 15 the user never learns about.
-- a full table only when the user asks to see all of them.
 - match the user's language, and whatever output style the session is running. A
-  terse style stays terse here too.
+  terse style stays terse here too - the columns stay aligned either way.
 - if `coverage` is well below 1 on every hit, one line saying the match is weak
   beats a confident guess.
 
