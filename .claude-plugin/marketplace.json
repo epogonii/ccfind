@@ -1,0 +1,14 @@
+{
+  "name": "ccfind",
+  "owner": {
+    "name": "epogonii"
+  },
+  "description": "Local-first search tooling for Claude Code. Currently one plugin: ccfind, BM25 full-text search over your own past sessions.",
+  "plugins": [
+    {
+      "name": "ccfind",
+      "source": "./",
+      "description": "Full-text BM25 search across your past Claude Code sessions. Finds the conversation where something was actually discussed and gives you the command to resume it. Fully local."
+    }
+  ]
+}
