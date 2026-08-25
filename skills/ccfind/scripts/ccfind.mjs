@@ -830,13 +830,16 @@ await import(pathToFileURL(target).href);
     for (const [c, a] of emulators()) console.log([c, ...a].map((x) => JSON.stringify(x)).join(' '));
     process.exit(0);
   }
+  // `osascript` is the tool, not the thing the user sees - name the app.
+  const label = (c) => (c !== 'osascript' ? c
+    : process.env.TERM_PROGRAM === 'iTerm.app' ? 'iTerm' : 'Terminal');
   let opened = null;
   for (const [c, a] of emulators()) {
     const r = spawnSync(c, a, { stdio: 'ignore' });
     if (!r.error && (r.status === 0 || r.status === null)) { opened = c; break; }
   }
   if (opened) {
-    console.log(`opened ${ses.title || ses.id.slice(0, 8)} in a new ${opened} window`);
+    console.log(`opened ${ses.title || ses.id.slice(0, 8)} in a new ${label(opened)} window`);
     console.log(`  ${cwd}`);
   } else {
     console.error('ccfind: could not open a terminal window here.');
