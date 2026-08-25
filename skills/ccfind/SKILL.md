@@ -124,6 +124,9 @@ Rules:
   whole `claude --resume` line only for the one you are recommending.
 - state what is not shown in a clause, not a paragraph: `+ 20 more`. Never let
   `total` be larger than what you listed without saying so.
+- report `total` as it comes back. If you narrow it further yourself - only the
+  `coverage: 1` hits, only one project - give both numbers (`8 of 23 with every
+  word`), because a bare "8 sessions" hides the 15 the user never learns about.
 - a full table only when the user asks to see all of them.
 - match the user's language, and whatever output style the session is running. A
   terse style stays terse here too.
