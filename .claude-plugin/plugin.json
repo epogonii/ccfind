@@ -1,7 +1,7 @@
 {
   "name": "ccfind",
   "description": "Full-text search across your past Claude Code sessions. Indexes local transcripts and ranks results with BM25, so you can find the conversation where something was actually discussed and jump back into it.",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "author": { "name": "epogonii" },
   "homepage": "https://github.com/epogonii/ccfind",
   "keywords": ["search", "history", "transcripts", "sessions", "recall"]

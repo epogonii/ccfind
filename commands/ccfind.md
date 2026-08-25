@@ -26,5 +26,7 @@ any `*.jsonl` files directly.
 
 Then offer the top three through `AskUserQuestion` plus a "show all N" option,
 and on whichever is picked run both `show <id> --json` (to answer from it) and
-`open <id>` (which launches a new terminal window on that session). End with
-`/resume <id>`, the built-in command that switches this window instead.
+`open <id>` (which launches a new terminal window on that session). End with the
+hit's `open` field verbatim - `/resume <full 36-char id>`, the built-in command
+that switches this window instead. Never abbreviate that id; the 8-char form
+belongs in the table column only.

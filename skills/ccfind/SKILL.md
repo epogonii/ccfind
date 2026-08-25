@@ -134,7 +134,8 @@ Rules:
   cut with `...`. A wrapped table is worse than a trimmed one.
 - that fragment is verbatim from `snippet`. Never paraphrase a snippet into
   something the transcript did not say.
-- id in backticks, 8 characters - enough to resume with.
+- id in backticks, 8 characters - but **only** in that column. Any line the user
+  has to type or copy carries the whole id.
 - after the table, the recommendation gets its own visual break. It is the one
   line the user acts on, so it must not read as a footnote to the table:
 
@@ -145,7 +146,10 @@ Rules:
   ```
 
   Bold label, one clause of why, then the session's `open` field on its own
-  line. `/resume <id>` is a built-in slash command: typed in this window it
+  line - copied **byte for byte** from the JSON. Never shorten it, never write
+  `/resume c3d4e5f6-...`: a truncated id is not something the user can type, so
+  an abbreviated line is a broken line. Terse output style does not license
+  trimming an identifier. `/resume <id>` is a built-in slash command: typed in this window it
   switches to that session in place. That is what the user means by "open it",
   so it is the line that must be easy to find. `claude --resume` (the `resume`
   field) is the terminal variant - mention it only if they are in a terminal.
@@ -194,7 +198,8 @@ session's own cwd - tmux window if they are in tmux, iTerm/Terminal on macOS, th
 installed emulator on Linux). Run it right after the pick; say which window
 opened, in one clause.
 
-And still give the last line: **`/resume <id>`**. That is the built-in slash
+And still give the last line: **`/resume <full-id>`** - the `open` field
+verbatim, all 36 characters, no ellipsis. That is the built-in slash
 command; typed in *this* window it switches this conversation to that session
 instead of opening a second one. A skill cannot type it for them - no tool
 switches the active session - so hand them the line every time. `open` for a new
