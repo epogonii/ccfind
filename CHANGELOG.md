@@ -3,6 +3,24 @@
 All versions are dated 2026-08-25: the project went from first commit to the
 plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.16.1
+
+- Documented the one step a new user cannot guess. The plugin installs a skill,
+  not a binary, so `ccfind pick` in a fresh terminal answers
+  `bash: ccfind: command not found` - which reads like a broken install rather
+  than a missing one-time command. The exact string now appears where someone who
+  just saw it will look: the terminal blurb at the top, the end of `## Install`,
+  and the first line of `Terminal command`. No new instructions were invented; the
+  existing section is simply reachable from where the problem is met.
+- The skill now checks `command -v ccfind` before recommending `pick`, and offers
+  `install` in the same breath when the command is missing, instead of leaving the
+  user to hit the error first. It still runs `install` only on request or on that
+  offer being taken, because the launcher is the one file ccfind writes outside
+  the plugin directory.
+- A plugin `bin/` directory would not have helped: Claude Code puts
+  `<plugin>/bin` on the PATH of the shells it spawns itself, and `pick` needs a
+  real terminal, which is exactly the PATH that entry never reaches.
+
 ## 0.16.0
 
 - `pick` gained an incremental filter. `/` opens a line under the list, prefilled

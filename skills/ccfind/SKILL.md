@@ -27,10 +27,13 @@ node <skill-dir>/scripts/ccfind.mjs open <session-id>             # new window o
 
 `pick "<query>"` also exists: an arrow-key list that runs `claude --resume` on
 Enter, with `/` to narrow the query in place. It needs a real terminal, so **never run it yourself** - a tool call has no
-tty and it would just print the list. Suggest it to the user instead, and if they
-have no `ccfind` command yet, `install` puts one on their PATH (`uninstall`
-undoes it). Run `install` only when the user asks for a terminal command; it
-writes outside the plugin directory.
+tty and it would just print the list. Suggest it to the user instead - and check
+`command -v ccfind` before you do. Without a launcher their shell answers
+`bash: ccfind: command not found`, which reads like a broken plugin rather than a
+missing one-time step, so say it in the same breath as the suggestion and offer
+`install`: it writes one launcher onto their PATH and `uninstall` removes it. Run
+`install` when they ask for a terminal command or take that offer, never on your
+own initiative - it writes outside the plugin directory.
 
 
 If either command fails with `node: command not found`, stop and tell the user

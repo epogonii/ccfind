@@ -50,8 +50,10 @@ table, which one to open, and the `/resume` line that switches this window to it
 
 **In a terminal** - `ccfind pick "<query>"`, arrows or the mouse over every hit,
 `/` to narrow the query without leaving the list, Enter hands the terminal to
-`claude --resume`. The `ccfind` command is a one-time `install` away - no alias,
-see [Terminal command](#terminal-command):
+`claude --resume`. A terminal that has never seen ccfind answers
+`bash: ccfind: command not found` - the plugin ships a script, not a command.
+One `install` fixes that for good, no alias to write: see
+[Terminal command](#terminal-command).
 
 <p align="center">
   <img src="docs/demo-term.gif" alt="ccfind pick in a terminal: an arrow-key list of matching sessions" width="100%">
@@ -83,6 +85,13 @@ Or from a shell, before you start Claude Code:
 claude plugin marketplace add epogonii/ccfind
 claude plugin install ccfind@ccfind
 ```
+
+Either way gives you `/ccfind` inside Claude Code. What it does not give you is a
+`ccfind` command in your own terminal - the plugin installs a skill, not a binary,
+so a shell answers `bash: ccfind: command not found`. For `ccfind pick` there too,
+the shortest fix is to ask Claude Code itself: *"run ccfind install"*. The shell
+equivalent, and what the launcher does, are under
+[Terminal command](#terminal-command).
 
 
 ## Using it
@@ -250,7 +259,8 @@ node skills/ccfind/scripts/ccfind.mjs bench "q1" "q2"             # latency per 
 ### Terminal command
 
 `ccfind` is not on your PATH out of the box - the plugin ships a script, not a
-binary. One command fixes that, no alias to write. The simplest way is to ask
+binary, so a shell answers `bash: ccfind: command not found` until you run this
+once. One command fixes it, no alias to write. The simplest way is to ask
 Claude Code itself: *"run ccfind install"*. From a plain terminal, point Node at
 the installed plugin (any cached version works - the launcher resolves the
 current one at run time):
