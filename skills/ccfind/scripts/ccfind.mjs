@@ -12,8 +12,15 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const HOME = os.homedir();
-const PROJECTS = path.join(HOME, '.claude', 'projects');
-const STORE = path.join(HOME, '.claude', 'ccfind');
+// Where Claude Code keeps its state. `CLAUDE_CONFIG_DIR` is Claude Code's own
+// override, so honouring it is the difference between finding a user's history
+// and reporting that they have none; `CCFIND_CONFIG_DIR` points ccfind at a
+// different corpus than the CLI is using, which is how the demo is recorded
+// against a synthetic history instead of somebody's real one.
+const CONFIG = process.env.CCFIND_CONFIG_DIR || process.env.CLAUDE_CONFIG_DIR
+             || path.join(HOME, '.claude');
+const PROJECTS = path.join(CONFIG, 'projects');
+const STORE = path.join(CONFIG, 'ccfind');
 const DOCS = path.join(STORE, 'docs.jsonl');
 const INDEX = path.join(STORE, 'index.json.gz');
 const STATE = path.join(STORE, 'state.json');

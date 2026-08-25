@@ -220,4 +220,6 @@ in a terminal. Recommend it when the list is long.
   stripped before indexing, so hits are on real conversation.
 - Images, encrypted advisor payloads, and thinking signatures are not indexed.
 - Tool output is indexed up to 16 KB per result; a huge dump is truncated.
-- The index lives in `~/.claude/ccfind/` and never leaves the machine.
+- The index lives in `~/.claude/ccfind/` and never leaves the machine. If the
+  user sets `CLAUDE_CONFIG_DIR`, both the corpus and the index follow it;
+  `CCFIND_CONFIG_DIR` overrides just ccfind.
