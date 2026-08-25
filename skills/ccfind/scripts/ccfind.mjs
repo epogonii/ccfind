@@ -9,6 +9,7 @@ import os from 'node:os';
 import readline from 'node:readline';
 import zlib from 'node:zlib';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const HOME = os.homedir();
 const PROJECTS = path.join(HOME, '.claude', 'projects');
@@ -693,6 +694,47 @@ if (cmd === 'index') {
     }
     if (turns.length > shown.length) {
       console.log(`\n${turns.length - shown.length} more turns - re-run with --turns ${turns.length}`);
+    }
+  }
+} else if (cmd === 'install' || cmd === 'uninstall') {
+  // `ccfind` on PATH without the user hand-writing an alias. A symlink, so a
+  // plugin update is picked up with nothing to redo.
+  const self = fileURLToPath(import.meta.url);
+  const onPath = (process.env.PATH || '').split(path.delimiter);
+  const candidates = [process.env.CCFIND_BIN_DIR, path.join(HOME, '.local', 'bin'),
+                      path.join(HOME, 'bin'), '/usr/local/bin'].filter(Boolean);
+  const writable = (d) => { try { fs.accessSync(d, fs.constants.W_OK); return true; } catch { return false; } };
+  let dir = candidates.find((d) => onPath.includes(d) && fs.existsSync(d) && writable(d))
+         || candidates.find((d) => fs.existsSync(d) && writable(d))
+         || path.join(HOME, '.local', 'bin');
+  const link = path.join(dir, 'ccfind');
+
+  if (cmd === 'uninstall') {
+    let st = null;
+    try { st = fs.lstatSync(link); } catch { console.log(`nothing at ${link}`); process.exit(0); }
+    if (!st.isSymbolicLink() || !fs.readlinkSync(link).endsWith('ccfind.mjs')) {
+      console.error(`ccfind: ${link} is not a ccfind symlink - leaving it alone`);
+      process.exit(1);
+    }
+    fs.unlinkSync(link);
+    console.log(`removed ${link}`);
+  } else {
+    fs.mkdirSync(dir, { recursive: true });
+    let st = null;
+    try { st = fs.lstatSync(link); } catch { /* free */ }
+    if (st && !st.isSymbolicLink()) {
+      console.error(`ccfind: ${link} already exists and is not a symlink - not touching it`);
+      process.exit(1);
+    }
+    if (st) fs.unlinkSync(link);
+    fs.symlinkSync(self, link);
+    try { fs.chmodSync(self, 0o755); } catch { /* read-only install is fine */ }
+    console.log(`installed: ${link} -> ${self}`);
+    if (!onPath.includes(dir)) {
+      console.log(`\n${dir} is not on your PATH. Add it:`);
+      console.log(`  echo 'export PATH="${dir}:$PATH"' >> ~/.zshrc && exec zsh`);
+    } else {
+      console.log('run it as: ccfind pick "<query>"');
     }
   }
 } else if (cmd === 'pick') {

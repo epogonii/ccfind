@@ -23,7 +23,10 @@ node <skill-dir>/scripts/ccfind.mjs show <session-id> --json      # one session'
 
 `pick "<query>"` also exists: an arrow-key list that runs `claude --resume` on
 Enter. It needs a real terminal, so **never run it yourself** - a tool call has no
-tty and it would just print the list. Suggest it to the user instead.
+tty and it would just print the list. Suggest it to the user instead, and if they
+have no `ccfind` command yet, `install` symlinks one onto their PATH (`uninstall`
+undoes it). Run `install` only when the user asks for a terminal command; it
+writes outside the plugin directory.
 
 
 If either command fails with `node: command not found`, stop and tell the user

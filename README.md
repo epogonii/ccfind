@@ -209,6 +209,19 @@ node skills/ccfind/scripts/ccfind.mjs pick "registry mirror"      # arrow-key pi
 node skills/ccfind/scripts/ccfind.mjs bench "q1" "q2"             # latency per query
 ```
 
+`ccfind` is not on your PATH out of the box - the plugin ships a script, not a
+binary. One command fixes that, no alias to write:
+
+```bash
+node "$CLAUDE_PLUGIN_ROOT/skills/ccfind/scripts/ccfind.mjs" install
+```
+
+It symlinks itself into the first writable directory already on your PATH
+(`~/.local/bin`, `~/bin`, `/usr/local/bin`, or `$CCFIND_BIN_DIR`), tells you which
+one, and prints the `export PATH` line if that directory turns out not to be on
+it. Because it is a symlink, plugin updates need nothing redone. `uninstall`
+removes it.
+
 `pick` is the one that answers "let me choose it and open it": up and down move,
 Enter hands the terminal to `claude --resume` for the highlighted session, `q`
 quits. It needs a real terminal - piped or captured, it falls back to printing the
