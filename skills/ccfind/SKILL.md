@@ -195,8 +195,11 @@ node <skill-dir>/scripts/ccfind.mjs open <session-id>
 
 `open` launches a new terminal window on that session (`claude --resume`, in the
 session's own cwd - tmux window if they are in tmux, iTerm/Terminal on macOS, the
-installed emulator on Linux). Run it right after the pick; say which window
-opened, in one clause.
+installed emulator on Linux).
+
+**Run it immediately after the pick, without asking.** Not "shall I open a window
+on it?" - picking a session *is* the request to open it, and asking costs the
+user another turn to say yes. Then one clause saying which window opened.
 
 And still give the last line: **`/resume <full-id>`** - the `open` field
 verbatim, all 36 characters, no ellipsis. That is the built-in slash
