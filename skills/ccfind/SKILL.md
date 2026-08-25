@@ -1,6 +1,6 @@
 ---
 name: ccfind
-description: Search the user's own past Claude Code sessions by content and report which conversation discussed a thing, when, in which project, and how to resume it. Use this whenever the user asks about something from an earlier session rather than the current one - "where did we", "which session was that", "we already fixed this", "what was that command", "did I ask about X before", "find the conversation about", "remind me how we solved", "search my history", "поищи в прошлых сессиях", "в какой сессии", "мы это уже делали" - or invokes /ccfind. Ranks whole transcripts with BM25 over prompts, answers, reasoning, tool calls and tool output, so an exact identifier, an error string, or a vague paraphrase all work. Runs entirely on local files with no API calls and no network.
+description: Search the user's own past Claude Code sessions by content and report which conversation discussed a thing, when, in which project, and how to resume it. Use this whenever the user asks about something from an earlier session rather than the current one - "where did we", "which session was that", "we already fixed this", "what was that command", "did I ask about X before", "find the conversation about", "remind me how we solved", "search my history" - or invokes /ccfind. The same asks in any other language fire it too: the trigger is what the user wants, not the words they used, and most users type these in their own language. Ranks whole transcripts with BM25 over prompts, answers, reasoning, tool calls and tool output, so an exact identifier, an error string, or a vague paraphrase all work. Runs entirely on local files with no API calls and no network.
 ---
 
 # ccfind
@@ -124,8 +124,8 @@ bare column of numbers leaves the user guessing what `169` meant.
 
 `Asked` is the `turns` field: how many times the user wrote into that session.
 Translate the headers when answering in another language, and translate them -
-never transliterate. A word like `Тёрнов` is not a word in the user's language
-and tells them nothing; `Вопросов` does.
+never transliterate. An English header respelled in the user's alphabet is not a
+word in their language and tells them nothing; the real word for it is.
 
 Rules:
 
@@ -133,7 +133,7 @@ Rules:
 - **every hit the search returned**, not the best three. `--limit 12` asks for
   twelve because the user wants the whole field; answering a twelve-hit search
   with three rows hides nine sessions. Trim cells, never drop rows.
-- keep the table from wrapping: title to ~18 chars, the `Совпало` cell to ~55,
+- keep the table from wrapping: title to ~18 chars, the `Matched` cell to ~55,
   cut with `...`. A wrapped table is worse than a trimmed one.
 - that fragment is verbatim from `snippet`. Never paraphrase a snippet into
   something the transcript did not say.
@@ -160,9 +160,10 @@ Rules:
 - report `total` as it comes back. If you narrow it further yourself - only the
   `coverage: 1` hits, only one project - give both numbers (`8 of 23 with every
   word`), because a bare "8 sessions" hides the 15 the user never learns about.
-- **English by default.** Switch language only when the user's own messages are
-  in another one, and then answer wholly in theirs - headers included. The
-  Russian examples elsewhere in this file are illustrations, not the default.
+- **Answer in the user's language, whatever it is.** This file is written in
+  English and its examples are English; that is the file's language, not a
+  default for the answer. Match the language of their own messages and answer
+  wholly in it - table headers, the recommendation, the picker options.
 - keep whatever output style the session is running. A terse style stays terse
   here too - the table stays a table either way.
 - if `coverage` is well below 1 on every hit, one line saying the match is weak
@@ -179,10 +180,10 @@ page through the hits three at a time:
 
 - options 1-3: the next three hits. Label = session title, description = date,
   project, and the `opening` turn.
-- option 4: `ещё 3 (4-6 из 13)` / `next 3 (4-6 of 13)` - naming the range, so the
-  user can see the arrows reach the whole list. Re-ask with the next three when
-  they take it. Only on the last page does option 4 become a plain
-  *show all N* dump.
+- option 4: `next 3 (4-6 of 13)`, in the language of the answer - naming the
+  range, so the user can see the arrows reach the whole list. Re-ask with the
+  next three when they take it. Only on the last page does option 4 become a
+  plain *show all N* dump.
 
 Whatever they pick, run `show <id> --json` and **answer their original question
 from it** - not a summary of the session for its own sake. Terse: what that

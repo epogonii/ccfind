@@ -86,8 +86,8 @@ Inside Claude Code, ask for it by name:
 
 Or don't. The skill fires on its own when you say things like *"where did we
 already fix this"*, *"which session was that"*, *"we did this before"*, *"search
-my history"*, *"поищи в прошлых сессиях"*. Either way you get the answer in the
-chat, and `/resume <id>` for the session it came from - typed in that same
+my history"* - in English or in whatever language you write in. Either way you
+get the answer in the chat, and `/resume <id>` for the session it came from - typed in that same
 window, the built-in slash command switches you into it, so you
 can keep reading with the whole original context, not a summary of it.
 
@@ -167,9 +167,9 @@ claim of beating `grep -rl`, which scores 1.00 by construction - the ground trut
 match belongs to, or hand back a session to resume. It also reads 90 MB per query
 where ccfind reads a 3.9 MB index.
 
-**The one miss is real.** `image-gc-high порог на ноде` has a single correct
-session; ccfind returns it at rank 2, with the exact `image-gc-high=75` snippet,
-behind a longer session that matched three common words but not the identifier.
+**The one miss is real.** One query - the identifier `image-gc-high` plus three
+ordinary words around it - has a single correct session; ccfind returns it at
+rank 2, with the exact `image-gc-high=75` snippet, behind a longer session that matched three common words but not the identifier.
 BM25's idf is logarithmic, so one rare identifier and two medium-rare words come
 out close, and a growing corpus tips it either way. Tuning constants until this
 one query passes would be fitting the benchmark, not fixing retrieval.
@@ -177,8 +177,8 @@ one query passes would be fitting the benchmark, not fixing retrieval.
 **P@3 is capped by the corpus**: one query has a single correct session, so its
 P@3 cannot exceed 0.33. The ceiling across the twelve is 0.94 against a measured
 0.89. The gap is two queries that put an unrelated session at rank 3 - one pulls
-in an Ansible session that matched only the common word "перезагрузка". The score
-already says so: 6.43 against 22.61 for the correct top hit. Rank 3 is where a
+in an Ansible session that matched only the query's one common word, *reboot*.
+The score already says so: 6.43 against 22.61 for the correct top hit. Rank 3 is where a
 lexical engine spends its uncertainty.
 
 **On the incumbent.** `claude-historian-mcp` retrieves by recency, not by the

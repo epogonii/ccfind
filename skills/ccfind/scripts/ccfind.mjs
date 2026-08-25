@@ -99,8 +99,8 @@ const INJECTED = [
   /<command-name>[\s\S]*?<\/command-name>/g,
   /<command-message>[\s\S]*?<\/command-message>/g,
   /<local-command-caveat>[\s\S]*?<\/local-command-caveat>/g,
-  // `/ccfind где мы разбирались с coredns` - the words inside the tag are the
-  // user's actual question. Dropping the whole element threw away the prompt of
+  // `/ccfind which session had the coredns fix` - the words inside the tag are
+  // the user's actual question. Dropping the whole element threw away the prompt of
   // every slash-command turn; only the wrapper is boilerplate.
   /<\/?command-args>/g,
   /<user-prompt-submit-hook>[\s\S]*?<\/user-prompt-submit-hook>/g,
@@ -415,10 +415,12 @@ function scoreDocs(idx, query) {
 // chunks add a capped bonus so a long noisy session cannot out-sum a precise
 // short one. Coverage of the typed terms multiplies - it is the strongest
 // signal that a conversation is about the thing asked for.
-// Coverage is weighted by idf squared, not by term count. "image-gc-high порог
-// на ноде" is answered by the one session containing the identifier, even though
-// it never says "порог". Plain idf is not enough: three ordinary words still
-// out-sum one rare identifier. Squaring makes the rarest term of a query
+// Coverage is weighted by idf squared, not by term count. A query like
+// "image-gc-high threshold on the node" is answered by the one session holding
+// that identifier, even when it never spells out the other three words - which
+// is the usual shape when the identifier is English and the sentence around it
+// is not. Plain idf is not enough: three ordinary words still out-sum one rare
+// identifier. Squaring makes the rarest term of a query
 // dominate its own coverage, which is what a person means when they type it.
 function rollup(entries, idfOf, restCap = 1.5, restWeight = 0.25) {
   let total = 0;
