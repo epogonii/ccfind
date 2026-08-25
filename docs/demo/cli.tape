@@ -15,7 +15,7 @@ Set TypingSpeed 28ms
 Hide
 Type "export CCFIND_CONFIG_DIR=__CORPUS__/.claude CCFIND_OPEN_DRYRUN=1 PS1='$ '; cd __WORK__; clear"
 Enter
-Type "claude --settings __WORK__/../demo-settings.json --model claude-sonnet-5"
+Type "claude --settings __WORK__/../demo-settings.json --plugin-dir __PLUGIN__ --model claude-sonnet-5"
 Enter
 # A fresh directory gets the workspace trust prompt; accept it while hidden.
 Wait+Screen@60s /trust|proceed/
@@ -23,7 +23,8 @@ Sleep 500ms
 Enter
 Wait+Screen@90s /shortcuts|Welcome|Try /
 Sleep 2s
-# Ctrl+L drops the welcome banner: it carries the account name and org.
+# Ctrl+L clears the scrollback but NOT the welcome banner, which carries the
+# account name and org - record.sh crops the top of the frame for that.
 Ctrl+L
 Sleep 1200ms
 Show
@@ -37,6 +38,7 @@ Sleep 2500ms
 Down
 Sleep 900ms
 Enter
-Wait+Screen@240s /resume [0-9a-f]{8}/
-Sleep 4s
+# The answer to the pick (session summary, then the open) takes ~30s. A Wait
+# here would match text that is already on screen, so hold a fixed window.
+Sleep 45s
 Hide

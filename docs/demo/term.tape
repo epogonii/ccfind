@@ -17,7 +17,7 @@ Enter
 Show
 Sleep 700ms
 
-Type "ccfind pick 'cluster'"
+Type "ccfind pick 'reboot'"
 Enter
 Wait+Screen@30s /click to move/
 Sleep 1800ms

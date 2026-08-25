@@ -34,17 +34,26 @@ So you solve it again. The transcript was on disk the whole time.
 
 ## What you get
 
-<p align="center">
-  <img src="docs/demo.gif" alt="Indexing a session history, then finding the right session from a paraphrase of the problem" width="100%">
-</p>
-
 Not "here are some related conversations". The session, the turn you asked it in,
 the line that mattered, and one command to be back inside that context with the
 full history - not a summary of it.
 
-<sub>That recording is the standalone CLI, run against a synthetic history so
-nothing private appears in it. The numbers under [Measured](#measured) come from a
-real 90 MB corpus.</sub>
+**Inside Claude Code** - `/ccfind:ccfind <what you remember>`: every match in one
+table, which one to open, and the `/resume` line that switches this window to it:
+
+<p align="center">
+  <img src="docs/demo-cli.gif" alt="Running /ccfind:ccfind inside Claude Code: a table of matching sessions and the session to resume" width="100%">
+</p>
+
+**In a terminal** - `ccfind pick "<query>"`, arrows or the mouse over every hit,
+Enter hands the terminal to `claude --resume`:
+
+<p align="center">
+  <img src="docs/demo-term.gif" alt="ccfind pick in a terminal: an arrow-key list of matching sessions" width="100%">
+</p>
+
+<sub>Both recordings run against a synthetic history, so nothing private appears
+in them. The numbers under [Measured](#measured) come from a real 90 MB corpus.</sub>
 
 ## Install
 
