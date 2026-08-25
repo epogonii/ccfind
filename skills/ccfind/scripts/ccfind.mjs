@@ -773,13 +773,25 @@ if (cmd === 'index') {
   const w = () => Math.min(Math.max(process.stdout.columns || 80, 60), 120);
   const trunc = (t, n) => (t && t.length > n ? t.slice(0, n - 1) + '…' : t || '');
 
+  // Rows visible at once: the terminal height minus the header and the detail
+  // pane, so a 13-hit list on a 24-row window scrolls instead of eating its own
+  // header. `top` is the first visible row and follows the cursor in draw().
+  let top = 0;
+  const viewport = () => Math.max(3, Math.min(rows.length, (process.stdout.rows || 24) - 9));
+
   const draw = () => {
     const width = w();
+    const vp = viewport();
+    if (cur < top) top = cur;
+    if (cur >= top + vp) top = cur - vp + 1;
+    if (top > rows.length - vp) top = Math.max(0, rows.length - vp);
     let out = `${ESC}[2J${ESC}[H`;
     out += `ccfind: ${res.total} session${res.total === 1 ? '' : 's'} match "${q}"` +
-           `${res.total > rows.length ? `, showing ${rows.length}` : ''}\n`;
+           `${res.total > rows.length ? `, showing ${rows.length}` : ''}` +
+           `${rows.length > vp ? `  [${cur + 1}/${rows.length}]` : ''}\n`;
     out += `${ESC}[2m up/down to move, enter to resume, q to quit${ESC}[0m\n\n`;
-    rows.forEach((h, i) => {
+    rows.slice(top, top + vp).forEach((h, k) => {
+      const i = top + k;
       const when = h.when ? h.when.slice(0, 10) : '          ';
       const label = `${when}  ${trunc(h.title || h.project, width - 34)}`;
       const score = String(h.score).padStart(7);
@@ -787,6 +799,11 @@ if (cmd === 'index') {
         ? `${ESC}[7m > ${label.padEnd(width - 12)}${score} ${ESC}[0m\n`
         : `   ${label.padEnd(width - 12)}${ESC}[2m${score}${ESC}[0m\n`;
     });
+    if (rows.length > vp) {
+      const above = top, below = rows.length - top - vp;
+      out += `${ESC}[2m   ${above ? `${above} above` : ''}${above && below ? ', ' : ''}` +
+             `${below ? `${below} below` : ''}${ESC}[0m\n`;
+    }
     const h = rows[cur];
     out += `\n${ESC}[2m${'-'.repeat(width - 2)}${ESC}[0m\n`;
     out += `${shortPath(h.cwd) || h.project}${h.branch ? '  ' + h.branch : ''}` +
@@ -802,18 +819,28 @@ if (cmd === 'index') {
   process.stdin.resume();
   process.stdin.setEncoding('utf8');
   draw();
-  process.stdin.on('data', (k) => {
-    if (k === '\u001b[A' || k === 'k') { cur = (cur - 1 + rows.length) % rows.length; draw(); }
-    else if (k === '\u001b[B' || k === 'j') { cur = (cur + 1) % rows.length; draw(); }
-    else if (k === '\r' || k === '\n') {
-      process.stdin.setRawMode(false);
-      process.stdout.write(`${ESC}[2J${ESC}[H`);
-      open(rows[cur]);
-    } else if (k === 'q' || k === '\u0003' || k === '\u001b') {
-      process.stdin.setRawMode(false);
-      process.stdout.write(`${ESC}[2J${ESC}[H`);
-      process.exit(0);
+  const leave = (fn) => {
+    process.stdin.setRawMode(false);
+    process.stdout.write(`${ESC}[2J${ESC}[H`);
+    fn();
+  };
+  // One chunk can carry several keys - held arrows, or a terminal that batches -
+  // so consume the whole buffer instead of comparing it to one sequence, which
+  // silently drops every keypress after the first.
+  process.stdin.on('data', (chunk) => {
+    let s = chunk, moved = false;
+    while (s.length) {
+      const three = s.slice(0, 3);
+      if (three === `${ESC}[A` || three === `${ESC}OA`) { cur = (cur - 1 + rows.length) % rows.length; moved = true; s = s.slice(3); continue; }
+      if (three === `${ESC}[B` || three === `${ESC}OB`) { cur = (cur + 1) % rows.length; moved = true; s = s.slice(3); continue; }
+      const k = s[0];
+      s = s.slice(1);
+      if (k === 'k') { cur = (cur - 1 + rows.length) % rows.length; moved = true; }
+      else if (k === 'j') { cur = (cur + 1) % rows.length; moved = true; }
+      else if (k === '\r' || k === '\n') return leave(() => open(rows[cur]));
+      else if (k === 'q' || k === '\u0003' || k === ESC) return leave(() => process.exit(0));
     }
+    if (moved) draw();
   });
 } else if (cmd === 'bench') {
   const queries = args._.slice(1);

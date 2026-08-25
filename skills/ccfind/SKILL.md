@@ -131,8 +131,22 @@ Rules:
   8-char id, turn count, then the shortest fragment that proves the match.
 - that fragment is verbatim from `snippet`, cut with `...`. Never paraphrase a
   snippet into something the transcript did not say.
-- outside the block, at most two lines: the one you recommend with its full
-  `claude --resume`, and the withheld count when `total` exceeds the rows.
+- after the block, the recommendation gets its own visual break - it is the one
+  line the user acts on, so it must not read as a footnote to the table:
+
+  ```
+  <blank line>
+  **Смотреть здесь: secret sync** - где синк наконец починили
+
+  ```bash
+  claude --resume c3d4e5f6-7a8b-4c9d-8e0f-112233445566
+  ```
+  ```
+
+  Bold label, one clause of why, then the resume command alone in a fenced
+  `bash` block so it is copyable in one gesture. Never bury it in the same
+  paragraph as the counts.
+- the withheld count when `total` exceeds the rows goes on its own line, plain.
 - report `total` as it comes back. If you narrow it further yourself - only the
   `coverage: 1` hits, only one project - give both numbers (`8 of 23 with every
   word`), because a bare "8 sessions" hides the 15 the user never learns about.
@@ -143,13 +157,19 @@ Rules:
 
 ## Letting the user pick
 
-Always end a session search with an `AskUserQuestion` picker rather than asking
-the user to copy an id or open a terminal: the top three sessions plus a *"show
-all N"* option. Not "when it seems useful" - always, because arrow keys in the
-chat are the only selection the user has, and a printed id costs them a copy, a
-window switch and a lost train of thought. Label = session title, description = date,
-project, and the `opening` turn. The picker takes four options at most, which is
-why the fourth one is the escape hatch to the full list.
+The block is text - the user cannot select in it. So **always** end a session
+search with an `AskUserQuestion` picker; that is the only arrow-key selection
+the chat has. Not "when it seems useful" - always.
+
+`AskUserQuestion` takes **four options, hard cap** (harness limit, not ours), so
+page through the hits three at a time:
+
+- options 1-3: the next three hits. Label = session title, description = date,
+  project, and the `opening` turn.
+- option 4: `ещё 3 (4-6 из 13)` / `next 3 (4-6 of 13)` - naming the range, so the
+  user can see the arrows reach the whole list. Re-ask with the next three when
+  they take it. Only on the last page does option 4 become a plain
+  *show all N* dump.
 
 Whatever they pick, run `show <id> --json` and **answer their original question
 from it** - not a summary of the session for its own sake. Terse: what that
@@ -160,9 +180,9 @@ now in this conversation.
 Be straight about the limit: **you cannot switch the active session for them.**
 `claude --resume` starts a separate run, and no skill can move this conversation
 into another one. Picking pulls that session's content in here, which keeps the
-work in progress. For the real jump, there is `claude --resume <id>` - or
-`ccfind.mjs pick "<query>"` in a terminal, which is an arrow-key list that hands
-the terminal straight to `claude --resume` on Enter.
+work in progress. Arrow keys over *every* hit, with Enter that really hands the
+terminal to `claude --resume`, exist in one place only: `ccfind pick "<query>"`
+in a terminal. Recommend it when the list is long.
 
 ## Notes
 
