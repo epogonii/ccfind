@@ -26,7 +26,7 @@ node <skill-dir>/scripts/ccfind.mjs open <session-id>             # new window o
 ```
 
 `pick "<query>"` also exists: an arrow-key list that runs `claude --resume` on
-Enter. It needs a real terminal, so **never run it yourself** - a tool call has no
+Enter, with `/` to narrow the query in place. It needs a real terminal, so **never run it yourself** - a tool call has no
 tty and it would just print the list. Suggest it to the user instead, and if they
 have no `ccfind` command yet, `install` puts one on their PATH (`uninstall`
 undoes it). Run `install` only when the user asks for a terminal command; it
@@ -227,9 +227,10 @@ verbatim, all 36 characters, no ellipsis. That is the built-in slash
 command; typed in *this* window it switches this conversation to that session
 instead of opening a second one. A skill cannot type it for them - no tool
 switches the active session - so hand them the line every time. `open` for a new
-window, `/resume` to switch here: never end a pick without both. Arrow keys over *every* hit, with Enter that really hands the
-terminal to `claude --resume`, exist in one place only: `ccfind pick "<query>"`
-in a terminal. Recommend it when the list is long.
+window, `/resume` to switch here: never end a pick without both. Arrow keys over *every* hit, an incremental filter on `/`, and
+Enter that really hands the terminal to `claude --resume` exist in one place
+only: `ccfind pick "<query>"` in a terminal. Recommend it when the list is long,
+or when the query looks like it needs a couple of tries.
 
 ## Notes
 

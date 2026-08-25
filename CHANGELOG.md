@@ -3,6 +3,26 @@
 All versions are dated 2026-08-25: the project went from first commit to the
 plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.16.0
+
+- `pick` gained an incremental filter. `/` opens a line under the list, prefilled
+  with the query already showing, and every keystroke re-runs the search:
+  backspace deletes, ctrl-u clears, Enter keeps the new query and returns to
+  moving through the list, Escape puts the old list back. Measured on the author's
+  own corpus: about 2.8 ms per keystroke, because the index is already in memory
+  by the time the picker draws and a re-query reads no file. The filter line is
+  drawn below the list and the list gives up two rows to it, so the screen row a
+  click lands on still means the same row. An empty or unmatched filter is a state
+  the screen survives rather than an exit: no cursor, no detail pane, Enter opens
+  nothing, and backspace types back into a list that matches.
+- The picker's key handling is now one function, and `CCFIND_PICK_KEYS` replays a
+  key script into it, so the filter is covered by the normal test suite instead of
+  needing a pseudo-terminal. `\e` is Escape, `\r` is Enter, `\b` is Backspace,
+  `\xNN` is that byte; when the script runs out, `pick` prints the query it ended
+  on and the session it left selected. 16 new tests, 85 in total.
+- Nothing about the terminal launch changed: `open` and its per-platform command
+  lines are the same bytes as 0.15.4 on Linux, macOS and tmux.
+
 ## 0.15.4
 
 - Fixed the rest of what 0.15.2 and 0.15.3 were aiming at: a Linux window opened

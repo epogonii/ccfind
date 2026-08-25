@@ -232,6 +232,51 @@ ok('pick without a tty prints the list', /zorblatt rollout/.test(r.out), r.out.s
 ok('pick prints whole ids, never a prefix', new RegExp(`/resume ${RECENT}`).test(r.out), r.out.slice(0, 200));
 eq('pick refuses an empty query', run(['pick']).status, 1);
 
+// The filter line. CCFIND_PICK_KEYS replays a key script into the same handler a
+// terminal drives, so this exercises the real key parsing without a pseudo-tty:
+// `\e` is Escape, `\r` is Enter, `\b` is Backspace, `\xNN` is that byte. When the
+// script runs out, pick prints the query it ended on and the selected session.
+const keys = (script, args = ['pick', 'zorblatt', '--all']) =>
+  run(args, { CCFIND_PICK_KEYS: script });
+
+r = keys('/ schema\\r');
+eq('a filtered pick exits 0', r.status, 0);
+ok('/ opens the filter on the query already showing', /filter: zorblatt schema/.test(r.out), r.out);
+ok('typing in the filter re-runs the search', new RegExp(`--resume ${MID}`).test(r.out), r.out);
+
+r = keys('/ schema\\e');
+ok('esc puts the old query back', /filter: zorblatt\n/.test(r.out), r.out);
+
+r = run(['pick', 'zorblatt', '--all'], { CCFIND_PICK_KEYS: '/ schema\\r\\r', CCFIND_PICK_DRYRUN: '1' });
+eq('enter after the filter opens the session', r.status, 0);
+ok('it opens what the filter selected', new RegExp(`claude --resume ${MID}`).test(r.out), r.out);
+
+r = keys('/zzzz');
+eq('a filter that matches nothing still exits 0', r.status, 0);
+ok('a filter that matches nothing says so', /\(no match\)/.test(r.out), r.out);
+
+// The first Enter commits the unmatched filter, so `jjkk` and the second Enter
+// land in the list itself, with nothing in it to move to or open.
+r = keys('/zzzz\\rjjkk\\r');
+eq('moving with nothing to move to is not an error', r.status, 0);
+ok('enter with nothing selected opens nothing', /\(no match\)/.test(r.out), r.out);
+
+r = keys('/zzzz\\b\\b\\b\\b');
+ok('backspace brings the hits back', /filter: zorblatt\n/.test(r.out), r.out);
+ok('backspace leaves a session selected', /--resume [0-9a-f]/.test(r.out), r.out);
+
+r = keys('/ schema\\x15zorblatt origins');
+ok('ctrl-u clears the filter', /filter: zorblatt origins/.test(r.out), r.out);
+ok('a cleared filter can be retyped', new RegExp(`--resume ${OLD}`).test(r.out), r.out);
+
+r = keys('/я');
+ok('the filter takes non-ascii', /filter: zorblattя/.test(r.out), r.out);
+
+// Moving still works with the filter closed, which is the half of the handler the
+// filter had to be threaded through without disturbing.
+ok('j and k pick different rows', keys('j').out !== keys('k').out,
+   `${keys('j').out}\n--\n${keys('k').out}`);
+
 // ------------------------------------------------------------------ open
 
 const LINUX = process.platform === 'linux';

@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "ccfind",
   "description": "Full-text search across your past Claude Code sessions. Indexes local transcripts and ranks results with BM25, so you can find the conversation where something was actually discussed and jump back into it.",
-  "version": "0.15.4",
+  "version": "0.16.0",
   "author": {
     "name": "Evghenii Pogonii"
   },

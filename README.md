@@ -49,8 +49,9 @@ table, which one to open, and the `/resume` line that switches this window to it
 </p>
 
 **In a terminal** - `ccfind pick "<query>"`, arrows or the mouse over every hit,
-Enter hands the terminal to `claude --resume`. The `ccfind` command is a one-time
-`install` away - no alias, see [Terminal command](#terminal-command):
+`/` to narrow the query without leaving the list, Enter hands the terminal to
+`claude --resume`. The `ccfind` command is a one-time `install` away - no alias,
+see [Terminal command](#terminal-command):
 
 <p align="center">
   <img src="docs/demo-term.gif" alt="ccfind pick in a terminal: an arrow-key list of matching sessions" width="100%">
@@ -292,7 +293,14 @@ one.
 `pick` is the one that answers "let me choose it and open it". Up and down or the
 mouse wheel move; a click selects a row and a second click on the highlighted row
 opens it; Enter hands the terminal to `claude --resume` for the highlighted
-session; `q` quits. Mouse tracking is switched off again on exit, so the
+session; `q` quits.
+
+`/` opens a filter line under the list, prefilled with the query that is already
+showing, and every keystroke re-runs the search: the index is in memory by then,
+so a re-query is about 3 ms on a 90 MB corpus. Backspace deletes, ctrl-u clears
+the line, Enter keeps the new query and goes back to moving through the list, and
+Escape puts the old list back. A query that matches nothing shows an empty list
+rather than exiting, so it can be typed out of again. Mouse tracking is switched off again on exit, so the
 terminal's own text selection comes back. It needs a real terminal - piped or
 captured, it falls back to printing the list. Inside Claude Code the skill offers the same choice through the built-in
 picker, but that can only pull the session's content into the current
@@ -323,7 +331,8 @@ node test/run.mjs
 ```
 
 End-to-end checks over indexing, search, every filter, the relevance gate,
-`show`, `pick` and all four ways a terminal launch can end. The suite builds its
+`show`, `pick` including its filter line, and all four ways a terminal launch can
+end. The suite builds its
 own corpus in a temporary directory and points `CCFIND_CONFIG_DIR` at it, so it
 never reads or writes a real `~/.claude`, and the terminal launches go to stub
 scripts on an otherwise empty `PATH`, so no window ever opens. No dependencies,

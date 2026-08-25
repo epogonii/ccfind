@@ -985,9 +985,11 @@ await import(pathToFileURL(target).href);
   // literally mean that: Enter hands the terminal to `claude --resume`.
   const q = args._.slice(1).join(' ');
   if (!q) { console.error('usage: ccfind.mjs pick <query> [--limit N] [--all]'); process.exit(1); }
+  const limit = posInt(args.limit, 15);
+  const all = !!args.all;
   let res;
   try {
-    res = search(q, { limit: posInt(args.limit, 15), group: 'session', all: !!args.all });
+    res = search(q, { limit, group: 'session', all });
   } catch (e) { console.error(`ccfind: ${e.message}`); process.exit(1); }
   if (!res.hits.length) { console.error(`nothing matched: ${res.terms.join(' ')}`); process.exit(1); }
 
@@ -1003,14 +1005,25 @@ await import(pathToFileURL(target).href);
     process.exit(r.status ?? 0);
   };
 
+  // A key script in CCFIND_PICK_KEYS is fed to the same handler a terminal feeds,
+  // which is how the filter gets tested without a pseudo-terminal: `\e` is Escape,
+  // `\r` is Enter, `\b` is Backspace, `\xNN` is that byte, and every other
+  // character is itself.
+  const keyScript = process.env.CCFIND_PICK_KEYS
+    ? process.env.CCFIND_PICK_KEYS
+        .replace(/\\e/g, '\u001b').replace(/\\r/g, '\r').replace(/\\b/g, '\u007f')
+        .replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    : '';
+
   // No tty means no arrows: print the list and the commands rather than pretending.
-  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+  if (!keyScript && (!process.stdin.isTTY || !process.stdout.isTTY)) {
     human(res);
     process.exit(0);
   }
 
   const ESC = '\u001b';
-  const rows = res.hits;
+  let rows = res.hits;
+  let query = q;
   let cur = 0;
   const w = () => Math.min(Math.max(process.stdout.columns || 80, 60), 120);
   const trunc = (t, n) => (t && t.length > n ? t.slice(0, n - 1) + '…' : t || '');
@@ -1019,19 +1032,40 @@ await import(pathToFileURL(target).href);
   // pane, so a 13-hit list on a 24-row window scrolls instead of eating its own
   // header. `top` is the first visible row and follows the cursor in draw().
   let top = 0;
-  const viewport = () => Math.max(3, Math.min(rows.length, (process.stdout.rows || 24) - 9));
+  // The filter line is drawn under the list, and the list gives up two rows to
+  // it, so the screen row a click lands on keeps meaning the same row either way.
+  let filtering = false, buf = '', saved = null;
+  const viewport = () => Math.max(3, Math.min(Math.max(rows.length, 1),
+    (process.stdout.rows || 24) - 9 - (filtering ? 2 : 0)));
 
+  // Every keystroke inside the filter re-runs the search. The index is already
+  // in memory by then, so that costs a few milliseconds and reads no file.
+  // An empty filter matches nothing, which is a state the screen has to survive:
+  // no cursor, no detail pane, and Enter opening nothing.
+  const requery = (text) => {
+    let r;
+    try { r = search(text, { limit, group: 'session', all }); } catch { return; }
+    res = r; rows = r.hits; query = text;
+    cur = rows.length ? Math.min(cur, rows.length - 1) : 0;
+    top = 0;
+  };
+  const step = (d) => { if (rows.length) cur = (cur + d + rows.length) % rows.length; };
+
+  let quiet = false;
   const draw = () => {
+    if (quiet) return;
     const width = w();
     const vp = viewport();
     if (cur < top) top = cur;
     if (cur >= top + vp) top = cur - vp + 1;
     if (top > rows.length - vp) top = Math.max(0, rows.length - vp);
     let out = `${ESC}[2J${ESC}[H`;
-    out += `ccfind: ${res.total} session${res.total === 1 ? '' : 's'} match "${q}"` +
+    out += `ccfind: ${res.total} session${res.total === 1 ? '' : 's'} match "${query}"` +
            `${res.total > rows.length ? `, showing ${rows.length}` : ''}` +
            `${rows.length > vp ? `  [${cur + 1}/${rows.length}]` : ''}\n`;
-    out += `${ESC}[2m up/down or click to move, enter or second click to resume, q to quit${ESC}[0m\n\n`;
+    out += filtering
+      ? `${ESC}[2m type to filter, enter to keep it, esc to put the old list back${ESC}[0m\n\n`
+      : `${ESC}[2m up/down or click to move, / to filter, enter to resume, q to quit${ESC}[0m\n\n`;
     rows.slice(top, top + vp).forEach((h, k) => {
       const i = top + k;
       const when = h.when ? h.when.slice(0, 10) : '          ';
@@ -1041,19 +1075,23 @@ await import(pathToFileURL(target).href);
         ? `${ESC}[7m > ${label.padEnd(width - 12)}${score} ${ESC}[0m\n`
         : `   ${label.padEnd(width - 12)}${ESC}[2m${score}${ESC}[0m\n`;
     });
+    if (!rows.length) out += `${ESC}[2m   nothing matches${ESC}[0m\n`;
     if (rows.length > vp) {
       const above = top, below = rows.length - top - vp;
       out += `${ESC}[2m   ${above ? `${above} above` : ''}${above && below ? ', ' : ''}` +
              `${below ? `${below} below` : ''}${ESC}[0m\n`;
     }
     const h = rows[cur];
-    out += `\n${ESC}[2m${'-'.repeat(width - 2)}${ESC}[0m\n`;
-    out += `${shortPath(h.cwd) || h.project}${h.branch ? '  ' + h.branch : ''}` +
-           `${h.turns ? `  ${h.turns} turns` : ''}\n`;
-    if (h.opening) out += `${ESC}[2mbegan:${ESC}[0m ${trunc(h.opening, w() - 8)}\n`;
-    if (h.prompt && h.prompt !== '(session start)')
-      out += `${ESC}[2masked:${ESC}[0m ${trunc(h.prompt, w() - 8)}\n`;
-    out += `${ESC}[2m${h.field}:${ESC}[0m ${trunc(h.snippet.replace(/\s+/g, ' '), w() - 8)}\n`;
+    if (h) {
+      out += `\n${ESC}[2m${'-'.repeat(width - 2)}${ESC}[0m\n`;
+      out += `${shortPath(h.cwd) || h.project}${h.branch ? '  ' + h.branch : ''}` +
+             `${h.turns ? `  ${h.turns} turns` : ''}\n`;
+      if (h.opening) out += `${ESC}[2mbegan:${ESC}[0m ${trunc(h.opening, w() - 8)}\n`;
+      if (h.prompt && h.prompt !== '(session start)')
+        out += `${ESC}[2masked:${ESC}[0m ${trunc(h.prompt, w() - 8)}\n`;
+      out += `${ESC}[2m${h.field}:${ESC}[0m ${trunc(h.snippet.replace(/\s+/g, ' '), w() - 8)}\n`;
+    }
+    if (filtering) out += `\n${ESC}[2mfilter:${ESC}[0m ${buf}${ESC}[7m ${ESC}[0m\n`;
     process.stdout.write(out);
   };
 
@@ -1064,21 +1102,20 @@ await import(pathToFileURL(target).href);
   // Rows start on the 4th screen line: header, hint, blank, then the list.
   const FIRST_ROW = 4;
 
-  process.stdin.setRawMode(true);
-  process.stdin.resume();
-  process.stdin.setEncoding('utf8');
-  process.stdout.write(MOUSE_ON);
-  process.on('exit', () => { try { process.stdout.write(MOUSE_OFF); } catch { /* closed */ } });
-  draw();
+  // Raw mode only exists when a terminal is on the other end, so a replayed key
+  // script has to be able to leave without touching it.
+  let raw = false;
   const leave = (fn) => {
-    process.stdin.setRawMode(false);
-    process.stdout.write(`${MOUSE_OFF}${ESC}[2J${ESC}[H`);
+    if (raw) {
+      process.stdin.setRawMode(false);
+      process.stdout.write(`${MOUSE_OFF}${ESC}[2J${ESC}[H`);
+    }
     fn();
   };
   // One chunk can carry several keys - held arrows, or a terminal that batches -
   // so consume the whole buffer instead of comparing it to one sequence, which
   // silently drops every keypress after the first.
-  process.stdin.on('data', (chunk) => {
+  const onKeys = (chunk) => {
     let s = chunk, moved = false;
     while (s.length) {
       // SGR mouse report: ESC [ < button ; col ; row (M press | m release)
@@ -1087,9 +1124,9 @@ await import(pathToFileURL(target).href);
         const [, btn, , rowStr, kind] = mouse;
         const b = +btn, row = +rowStr;
         s = s.slice(mouse[0].length);
-        if (b === 64) { cur = (cur - 1 + rows.length) % rows.length; moved = true; continue; }  // wheel up
-        if (b === 65) { cur = (cur + 1) % rows.length; moved = true; continue; }                // wheel down
-        if (kind !== 'M' || b !== 0) continue;                                                  // release, or not left button
+        if (b === 64) { step(-1); moved = true; continue; }  // wheel up
+        if (b === 65) { step(1); moved = true; continue; }   // wheel down
+        if (kind !== 'M' || b !== 0) continue;               // release, or not the left button
         const hit = top + (row - FIRST_ROW);
         if (hit < 0 || hit >= rows.length || row < FIRST_ROW) continue;   // clicked outside the list
         if (hit === cur) return leave(() => open(rows[cur]));             // click the highlighted row to open it
@@ -1097,17 +1134,51 @@ await import(pathToFileURL(target).href);
         continue;
       }
       const three = s.slice(0, 3);
-      if (three === `${ESC}[A` || three === `${ESC}OA`) { cur = (cur - 1 + rows.length) % rows.length; moved = true; s = s.slice(3); continue; }
-      if (three === `${ESC}[B` || three === `${ESC}OB`) { cur = (cur + 1) % rows.length; moved = true; s = s.slice(3); continue; }
+      if (three === `${ESC}[A` || three === `${ESC}OA`) { step(-1); moved = true; s = s.slice(3); continue; }
+      if (three === `${ESC}[B` || three === `${ESC}OB`) { step(1); moved = true; s = s.slice(3); continue; }
       const k = s[0];
       s = s.slice(1);
-      if (k === 'k') { cur = (cur - 1 + rows.length) % rows.length; moved = true; }
-      else if (k === 'j') { cur = (cur + 1) % rows.length; moved = true; }
-      else if (k === '\r' || k === '\n') return leave(() => open(rows[cur]));
+      if (filtering) {
+        // The escape sequences above are matched first, so an arrow key moves the
+        // cursor here too instead of typing itself into the buffer. Anything from
+        // U+0020 up is a character the query can hold, Cyrillic included.
+        if (k === '\r' || k === '\n') { filtering = false; saved = null; moved = true; }
+        else if (k === ESC) { ({ res, rows, query, cur, top } = saved); filtering = false; saved = null; moved = true; }
+        else if (k === '\u0003') return leave(() => process.exit(0));
+        else if (k === '\u007f' || k === '\u0008') { buf = buf.slice(0, -1); requery(buf); moved = true; }
+        else if (k === '\u0015') { buf = ''; requery(buf); moved = true; }  // ctrl-u clears the line
+        else if (k.codePointAt(0) >= 32) { buf += k; requery(buf); moved = true; }
+        continue;
+      }
+      if (k === 'k') { step(-1); moved = true; }
+      else if (k === 'j') { step(1); moved = true; }
+      // `/` opens the filter on the query that is already showing, so a search can
+      // be narrowed in place instead of quitting and running ccfind again.
+      else if (k === '/') { saved = { res, rows, query, cur, top }; filtering = true; buf = query; moved = true; }
+      else if (k === '\r' || k === '\n') { if (rows.length) return leave(() => open(rows[cur])); }
       else if (k === 'q' || k === '\u0003' || k === ESC) return leave(() => process.exit(0));
     }
     if (moved) draw();
-  });
+  };
+
+  if (keyScript) {
+    // Replaying keys with the screen off: what a test reads is the state the keys
+    // left behind, printed once the script runs out.
+    quiet = true;
+    onKeys(keyScript);
+    console.log(`filter: ${query}`);
+    console.log(rows.length ? rows[cur].resume : '(no match)');
+    process.exit(0);
+  }
+
+  raw = true;
+  process.stdin.setRawMode(true);
+  process.stdin.resume();
+  process.stdin.setEncoding('utf8');
+  process.stdout.write(MOUSE_ON);
+  process.on('exit', () => { try { process.stdout.write(MOUSE_OFF); } catch { /* closed */ } });
+  draw();
+  process.stdin.on('data', onKeys);
 } else if (cmd === 'bench') {
   const queries = args._.slice(1);
   if (!queries.length) { console.error('bench needs queries'); process.exit(1); }
