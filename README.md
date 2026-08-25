@@ -42,40 +42,47 @@ Not "here are some related conversations". The session, the turn you asked it in
 the line that mattered, and one command to be back inside that context with the
 full history - not a summary of it.
 
-Inside Claude Code you never type that command. You ask:
+<sub>That recording is the standalone CLI, run against a synthetic history so
+nothing private appears in it. The numbers under [Measured](#measured) come from a
+real 90 MB corpus.</sub>
+
+## Install
+
+Two lines, typed inside Claude Code:
+
+```
+/plugin marketplace add epogonii/ccfind
+/plugin install ccfind@ccfind
+```
+
+Or from a shell, before you start Claude Code:
+
+```bash
+claude plugin marketplace add epogonii/ccfind
+claude plugin install ccfind@ccfind
+```
+
+Needs **Node 18+** on `PATH` and nothing else - no npm install, no dependencies,
+no network, no API keys. Claude Code's native installer does not ship a Node
+runtime, so run `node -v` first if the skill reports it cannot start. macOS and
+Linux; Windows is untested.
+
+## Using it
+
+Inside Claude Code, ask for it by name:
 
 ```
 /ccfind why did the node take so long to reboot
 ```
 
-or just say it in passing - "where did we sort out the reboot hang?" - and the
-skill fires on its own, runs the same search, and answers from the result.
+Or don't. The skill fires on its own when you say things like *"where did we
+already fix this"*, *"which session was that"*, *"we did this before"*, *"search
+my history"*, *"поищи в прошлых сессиях"*. Either way you get the answer in the
+chat, and the `claude --resume <id>` line for the session it came from - so you
+can keep reading with the whole original context, not a summary of it.
 
-<sub>The recording runs against a synthetic history so nothing private appears in
-it. The numbers under [Measured](#measured) come from a real 90 MB corpus.</sub>
-
-## Requirements
-
-Node 18 or newer on `PATH`. Nothing else - no npm install, no dependencies, no
-network, no API keys. Claude Code's native installer does not ship a Node
-runtime, so run `node -v` first if the skill reports it cannot start.
-
-## Install
-
-```
-/plugin marketplace add epogonii/ccfind
-/plugin install ccfind
-```
-
-Then ask in your own words, or use the command:
-
-```
-/ccfind containerd registry config
-```
-
-Claude also reaches for it unprompted on things like *"where did we already do
-this"*, *"which session was that"*, *"we fixed this before"*, *"search my
-history"*.
+The GIF above is the same search run as a plain command; you can drive it that way
+too, see [CLI](#cli).
 
 ## How it works
 

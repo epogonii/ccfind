@@ -348,9 +348,9 @@ async function buildIndex({ full = false, quiet = false } = {}) {
 
   if (!quiet) {
     console.error(
-      `ccfind: indexed ${files.length} transcripts, ${sessions.length} sessions, ` +
-      `${exchanges.length} exchanges, ${N} chunks, ${Object.keys(post).length} terms ` +
-      `(${dropped} too common), ${(bytesRead / 1048576).toFixed(1)} MB read, ${Date.now() - t0} ms`
+      `ccfind: indexed ${files.length} sessions, ` +
+      `${(bytesRead / 1048576).toFixed(1)} MB of transcripts, in ${Date.now() - t0} ms` +
+      (dropped ? ` (${dropped} words too common to be useful)` : '')
     );
   }
   return index;
@@ -560,19 +560,65 @@ function parseArgs(argv) {
   return o;
 }
 
+// Plain-text output is what a first-time reader sees, so it spells things out:
+// where the session lived, the words the user themselves used, and which part of
+// the conversation the match landed in. --json carries the raw numbers.
+const FIELD_LABEL = {
+  title: 'the session name',
+  prompt: 'your own question',
+  answer: 'the answer',
+  thinking: 'the reasoning',
+  tool: 'a command that ran',
+  output: 'command output',
+  summary: 'the session summary',
+};
+
+function wrap(text, width, indent) {
+  const out = [];
+  let line = '';
+  for (const w of String(text).split(/\s+/)) {
+    if (line && line.length + 1 + w.length > width) { out.push(line); line = w; }
+    else line = line ? `${line} ${w}` : w;
+  }
+  if (line) out.push(line);
+  return out.map((l) => indent + l).join('\n');
+}
+
+function shortPath(p) {
+  if (!p) return null;
+  return p === HOME ? '~' : p.startsWith(HOME + path.sep) ? '~' + p.slice(HOME.length) : p;
+}
+
 function human(res) {
   if (!res.hits.length) {
-    console.log(`no matches for: ${res.terms.join(', ')}`);
+    console.log(`nothing matched: ${res.terms.join(' ')}`);
     return;
   }
-  console.log(`${res.hits.length} of ${res.group === 'session' ? res.sessionsScored + ' sessions' : res.exchangesScored + ' exchanges'} matched (terms: ${res.terms.join(' ')})\n`);
+  const width = Math.min(Math.max(process.stdout.columns || 88, 60), 100);
+  const total = res.group === 'session' ? res.sessionsScored : res.exchangesScored;
+  const unit = res.group === 'session' ? 'session' : 'turn';
+  console.log(res.hits.length < total
+    ? `best ${res.hits.length} of ${total} matching ${unit}s:\n`
+    : `${total} matching ${unit}${total === 1 ? '' : 's'}:\n`);
+  let n = 0;
   for (const h of res.hits) {
-    const when = h.when ? h.when.slice(0, 16).replace('T', ' ') : '?';
-    console.log(`[${h.score}] ${when}  ${h.title || h.project}${h.branch ? '  @' + h.branch : ''}${h.sidechain ? '  (subagent)' : ''}`);
-    console.log(`  ask: ${h.prompt}`);
-    console.log(`  hit: ${h.field}  cov ${h.coverage}  ${h.chunks} chunk${h.chunks === 1 ? '' : 's'}  ${h.project}`);
-    console.log(`  ${h.snippet}`);
-    console.log(`  ${h.resume}\n`);
+    n++;
+    const when = h.when ? h.when.slice(0, 16).replace('T', ' ') : 'date unknown';
+    const meta = [when, shortPath(h.cwd) || h.project];
+    if (h.branch) meta.push(h.branch);
+    if (h.sidechain) meta.push('subagent');
+    const words = res.terms.length;
+    const found = Math.round(h.coverage * words);
+    const cov = found >= words
+      ? `all ${words} word${words === 1 ? '' : 's'} present`
+      : `${found} of ${words} words present`;
+    console.log(`${n}. ${h.title || h.project}`);
+    console.log(`   ${meta.join('  ')}`);
+    console.log(`   score ${h.score}, ${cov}`);
+    if (h.prompt) console.log(wrap(`you asked: "${h.prompt}"`, width - 3, '   '));
+    console.log(`   matched in ${FIELD_LABEL[h.field] || h.field}:`);
+    console.log(wrap(h.snippet, width - 5, '     '));
+    console.log(`   resume it: ${h.resume}\n`);
   }
 }
 
