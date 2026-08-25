@@ -885,21 +885,24 @@ await import(pathToFileURL(target).href);
   if (!ses) { console.error(`ccfind: no session starting with ${want}`); process.exit(1); }
   const cwd = ses.cwd && fs.existsSync(ses.cwd) ? ses.cwd : HOME;
   const inner = `cd ${JSON.stringify(cwd)} && claude --resume ${ses.id}`;
-  // The same command with the shell kept above it, for the Linux emulators only.
-  // A shell handed `-c` replaces itself with the last command rather than forking
-  // it, so plain `inner` makes `claude` the terminal's own process. Emulators that
-  // offer to confirm closing a window - ptyxis, gnome-terminal, konsole - decide
-  // that by looking for a child process still running: they find none, and the
-  // first click on the close button ends the resumed session with no prompt, while
-  // every other window of the same terminal asks first. The trailing builtin puts
-  // `claude` back where those emulators look, and the exit status is still its own.
+  // The same command wrapped so a Linux emulator still confirms closing the
+  // window. Two things are needed and neither is enough alone. `set -m` turns on
+  // job control, which puts `claude` in its own process group: a VTE terminal
+  // decides whether anything is running by comparing the pty's foreground process
+  // group with the process it spawned, and without job control `claude` shares the
+  // shell's group, the two match, and the first click on the close button ends the
+  // session with no prompt - while every other window of the same terminal asks.
+  // The trailing `exit $?` is what keeps a shell there to own that group at all:
+  // a shell handed `-c` replaces itself with the last command rather than forking
+  // it, job control or not, so without the builtin `claude` simply becomes the
+  // terminal's own process again. The exit status is still `claude`'s.
   //
-  // Not on macOS: there `do script` runs the text in a new window's *interactive*
-  // shell, which stays at a prompt when `claude` exits. `exit` would close that
-  // window instead, which is a loss, and Terminal and iTerm already warn about a
-  // running process because it is a child of that shell already. Not in tmux
-  // either - `kill-window` never asks, so the extra shell would buy nothing.
-  const guiInner = `${inner}; exit $?`;
+  // Not on macOS: `do script` types the command into a new window's *interactive*
+  // shell, which already has job control and stays at a prompt when `claude`
+  // quits, so Terminal and iTerm warn on their own - and exiting that shell would
+  // close a window the user was meant to keep. Not in tmux either: `kill-window`
+  // never asks.
+  const guiInner = `set -m; ${inner}; exit $?`;
 
   // Ordered by how little it surprises the user: their own multiplexer first,
   // then the terminal they are actually in, then anything installed.

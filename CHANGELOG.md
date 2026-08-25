@@ -3,6 +3,23 @@
 All versions are dated 2026-08-25: the project went from first commit to the
 plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.15.4
+
+- Fixed the rest of what 0.15.2 and 0.15.3 were aiming at: a Linux window opened
+  by `open` still closed without the confirmation the same terminal shows for
+  every other window. Keeping a shell above `claude` was necessary but not
+  sufficient. A VTE terminal decides whether anything is running by comparing the
+  pty's foreground process group with the process it spawned, and a shell handed
+  `-c` runs its command in its own process group unless job control is on, so the
+  two matched and the terminal saw an idle window. Measured: without `set -m` the
+  child's pgid is the shell's own, with it the child leads its own group - which is
+  exactly the shape an interactive shell produces, and confirmed in a real ptyxis
+  window, which then asked before closing. The Linux command is now
+  `sh -lc 'set -m; cd <cwd> && claude --resume <id>; exit $?'`. Both halves are
+  needed: `set -m` for the process group, the trailing builtin to stop the shell
+  from replacing itself with `claude`. macOS and tmux are untouched - their command
+  lines are byte-identical to 0.15.1's.
+
 ## 0.15.3
 
 - Fixed a regression in 0.15.2 that only showed on macOS. The `; exit $?` added to

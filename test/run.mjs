@@ -243,20 +243,21 @@ ok('every candidate runs the resume command', ladder.every((l) => l.includes('cl
 if (LINUX) {
   ok('the ladder starts with the freedesktop dispatcher', /^"xdg-terminal-exec"/.test(ladder[0]), ladder[0]);
   ok('the ladder knows the current GNOME terminal', r.out.includes('"ptyxis"'), r.out);
-  // A shell given `-c` execs the last command instead of forking it, which would
-  // make `claude` the terminal's own process - and an emulator that confirms
-  // closing a window looks for a child, finds none, and closes on the first click
-  // without asking. The trailing builtin keeps the shell alive so that prompt
-  // appears for a resumed session too.
+  // Closing a window is only confirmed when the pty's foreground process group
+  // differs from the process the terminal spawned. That needs both halves: the
+  // trailing builtin, or the shell execs itself away and `claude` becomes the
+  // spawned process; and `set -m`, or `claude` runs in the shell's own group and
+  // the two still match. Measured: without job control the child's pgid is the
+  // shell's, with it the child leads its own group.
   ok('a Linux window keeps a shell above claude so closing it still prompts',
-     ladder.every((l) => /claude --resume [^"]*; exit \$\?/.test(l)), r.out);
+     ladder.every((l) => /"set -m; cd .*claude --resume [^"]*; exit \$\?"$/.test(l)), r.out);
 }
 if (DARWIN) ok('the ladder drives the macOS terminal through osascript', r.out.includes('"osascript"'), r.out);
 // macOS must NOT get that trailing builtin: `do script` runs the text in a new
 // window's interactive shell, so exiting it would close a window that otherwise
 // stays at a prompt when claude quits.
 if (DARWIN) ok('the macOS command leaves the interactive shell alive',
-               !/; exit \$\?/.test(r.out), r.out);
+               !/; exit \$\?/.test(r.out) && !/set -m/.test(r.out), r.out);
 ok('a multiplexer wins outright', run(['open', RECENT], { CCFIND_OPEN_DRYRUN: '1', TMUX: 'fake' }).out.trim().split('\n').length === 1);
 
 // The four ways a launch can go, as stub scripts. On Linux the ladder honours
