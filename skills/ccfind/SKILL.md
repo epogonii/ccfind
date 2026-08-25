@@ -108,34 +108,31 @@ the turn rather than the conversation.
 
 Terse, and legible in a terminal. The question is *which session*.
 
-One fenced block, one line per hit, columns aligned. A numbered prose list with
-italic quotes and blockquote pipes wraps into mush at terminal width - that is
-the single biggest thing that makes an answer here unreadable.
+A markdown table, one row per hit. The headers are what makes it readable - a
+bare column of numbers leaves the user guessing what `169t` was. Header names go
+in the user's language.
 
-```
-1  secret sync          08-05  acme-dev  c3d4e5f6   14t  секреты по одному, а не пачкой
-2  новый кластер    08-06  acme-dev  b2c3d4e5   31t  карта всех сторов
-3  registry mirror            08-06  acme-dev  a1b2c3d4  927t  перенос конфига реестра
-...
-8  ansible        07-31  infra     d4e5f6a7    6t  secrets.yaml на 10.0.0.4
-```
+| # | Сессия | Дата | Проект | id | Тёрнов | Совпало |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | registry mirror | 08-06 | infra | `a1b2c3d4` | 169 | "перенеси конфиг реестра" |
+| 2 | новый кластер | 08-06 | infra | `b2c3d4e5` | 6 | "secret-backend staging ..." |
+| 3 | secret sync | 08-05 | infra | `c3d4e5f6` | 30 | "'API_TOKEN', 'BROKER_URL..." |
 
 Rules:
 
-- no preamble. Not "I ran a search and found" - the block first.
-- **list every hit the search returned**, not the best three. `--limit 12` asks
-  for twelve because the user wants the whole field; answering a twelve-hit
-  search with three lines hides nine sessions. Trim the last column, never drop
-  rows.
-- columns, in order: number, title (cut to ~14 chars), MM-DD, project leaf,
-  8-char id, turn count, then the shortest fragment that proves the match.
-- that fragment is verbatim from `snippet`, cut with `...`. Never paraphrase a
-  snippet into something the transcript did not say.
-- after the block, the recommendation gets its own visual break - it is the one
+- no preamble. Not "I ran a search and found" - the table first.
+- **every hit the search returned**, not the best three. `--limit 12` asks for
+  twelve because the user wants the whole field; answering a twelve-hit search
+  with three rows hides nine sessions. Trim cells, never drop rows.
+- keep the table from wrapping: title to ~18 chars, the `Совпало` cell to ~55,
+  cut with `...`. A wrapped table is worse than a trimmed one.
+- that fragment is verbatim from `snippet`. Never paraphrase a snippet into
+  something the transcript did not say.
+- id in backticks, 8 characters - enough to resume with.
+- after the table, the recommendation gets its own visual break. It is the one
   line the user acts on, so it must not read as a footnote to the table:
 
   ```
-  <blank line>
   **Смотреть здесь: secret sync** - где синк наконец починили
 
   ```bash
@@ -144,14 +141,13 @@ Rules:
   ```
 
   Bold label, one clause of why, then the resume command alone in a fenced
-  `bash` block so it is copyable in one gesture. Never bury it in the same
-  paragraph as the counts.
-- the withheld count when `total` exceeds the rows goes on its own line, plain.
+  `bash` block so it is copyable in one gesture.
+- the withheld count goes on its own plain line when `total` exceeds the rows.
 - report `total` as it comes back. If you narrow it further yourself - only the
   `coverage: 1` hits, only one project - give both numbers (`8 of 23 with every
   word`), because a bare "8 sessions" hides the 15 the user never learns about.
 - match the user's language, and whatever output style the session is running. A
-  terse style stays terse here too - the columns stay aligned either way.
+  terse style stays terse here too - the table stays a table either way.
 - if `coverage` is well below 1 on every hit, one line saying the match is weak
   beats a confident guess.
 

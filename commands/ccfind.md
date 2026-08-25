@@ -13,13 +13,13 @@ node "$CLAUDE_PLUGIN_ROOT/skills/ccfind/scripts/ccfind.mjs" index
 node "$CLAUDE_PLUGIN_ROOT/skills/ccfind/scripts/ccfind.mjs" search "$ARGUMENTS" --limit 12 --json
 ```
 
-Answer in one fenced block, one aligned line per hit - number, title, MM-DD,
-project, 8-char session id, turn count, and the shortest verbatim fragment that
-proves the match. List **every** hit the search returned, not the best three; if
-`total` is higher, say how many are still unshown. After the block, on its own line:
-a bold **recommendation** with one clause of why, then its `claude --resume`
-command alone in a fenced `bash` block - that line is what the user acts on. Do not read any `*.jsonl`
-files directly.
+Answer with a markdown table, one row per hit: `#`, session title, MM-DD,
+project, 8-char id in backticks, turn count, and the shortest verbatim fragment
+that proves the match. Headers in the user's language. List **every** hit the
+search returned, not the best three; if `total` is higher, say how many are
+unshown on its own line. Then a bold recommendation line with one clause of why,
+and its `claude --resume` command alone in a fenced `bash` block. Do not read
+any `*.jsonl` files directly.
 
 Then offer the top three through `AskUserQuestion` plus a "show all N" option,
 and run `show <id> --json` on whichever is picked.
