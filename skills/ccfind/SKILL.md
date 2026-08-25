@@ -135,15 +135,19 @@ Rules:
 
 ## Letting the user pick
 
-When the user's next move is obviously "open that one", end with an
-`AskUserQuestion` picker instead of asking them to copy an id: the top three
-sessions plus a *"show all N"* option. Label = session title, description = date,
+Always end a session search with an `AskUserQuestion` picker rather than asking
+the user to copy an id or open a terminal: the top three sessions plus a *"show
+all N"* option. Not "when it seems useful" - always, because arrow keys in the
+chat are the only selection the user has, and a printed id costs them a copy, a
+window switch and a lost train of thought. Label = session title, description = date,
 project, and the `opening` turn. The picker takes four options at most, which is
 why the fourth one is the escape hatch to the full list.
 
-Whatever they pick, run `show <id> --json` and answer from it. Keep that answer
-terse too: what the session was about, and where the thing they asked about sits
-in it.
+Whatever they pick, run `show <id> --json` and **answer their original question
+from it** - not a summary of the session for its own sake. Terse: what that
+session concluded about the thing they asked, and where in it that sits. Then
+they can keep asking about it here, which is the point: the session's content is
+now in this conversation.
 
 Be straight about the limit: **you cannot switch the active session for them.**
 `claude --resume` starts a separate run, and no skill can move this conversation
