@@ -118,9 +118,9 @@ bare column of numbers leaves the user guessing what `169` meant.
 
 | # | Session | Date | Project | id | Asked | Matched |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | registry mirror | 08-06 | infra | `a1b2c3d4` | 169 | "move the mirror config over" |
-| 2 | node bootstrap | 08-06 | infra | `b2c3d4e5` | 6 | "secret-backend staging ..." |
-| 3 | secret sync | 08-05 | infra | `c3d4e5f6` | 30 | "'API_TOKEN', 'BROKER_URL..." |
+| 1 | registry mirror | 08-06 | infra | `a1b2c3d4` | 169 | "containerd ignores the mirror" |
+| 2 | node bootstrap | 08-06 | infra | `b2c3d4e5` | 6 | "kubelet never registers, cert ..." |
+| 3 | secret sync | 08-05 | infra | `c3d4e5f6` | 30 | "'API_TOKEN', 'BROKER_URL' mis..." |
 
 `Asked` is the `turns` field: how many times the user wrote into that session.
 Translate the headers when answering in another language, and translate them -

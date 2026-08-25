@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# node
+node_modules/
+npm-debug.log*
+
+# local recording scratch (the tapes are tracked; the temp corpus and
+# rendered work files are not)
+docs/demo/*.local.tape
+*.local
+*.log
