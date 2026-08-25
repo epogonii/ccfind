@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/icon.png" alt="" width="112" height="112">
+</p>
+
 <h1 align="center">ccfind</h1>
 
 <p align="center">
@@ -30,25 +34,25 @@ So you solve it again. The transcript was on disk the whole time.
 
 ## What you get
 
-```console
-$ /ccfind why did the node take so long to reboot
-
-Session "cluster-setup", 2026-07-28 - score 34.2, coverage 1
-
-  ask:  reboots on the workers hang for minutes, find out why
-  hit:  output · 12 chunks
-
-  > Failed to start node shutdown manager: timed out after 5 attempts
-  > waiting for logind InhibitDelayMaxSec to update to 2m0s, current 30s
-
-  Cause: a drop-in from unattended-upgrades overrode the setting.
-
-  claude --resume a1b2c3d4-5e6f-7890-abcd-ef1234567890
-```
+<p align="center">
+  <img src="docs/demo.gif" alt="Indexing a session history, then finding the right session from a paraphrase of the problem" width="100%">
+</p>
 
 Not "here are some related conversations". The session, the turn you asked it in,
 the line that mattered, and one command to be back inside that context with the
 full history - not a summary of it.
+
+Inside Claude Code you never type that command. You ask:
+
+```
+/ccfind why did the node take so long to reboot
+```
+
+or just say it in passing - "where did we sort out the reboot hang?" - and the
+skill fires on its own, runs the same search, and answers from the result.
+
+<sub>The recording runs against a synthetic history so nothing private appears in
+it. The numbers under [Measured](#measured) come from a real 90 MB corpus.</sub>
 
 ## Requirements
 

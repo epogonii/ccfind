@@ -570,7 +570,7 @@ function human(res) {
     const when = h.when ? h.when.slice(0, 16).replace('T', ' ') : '?';
     console.log(`[${h.score}] ${when}  ${h.title || h.project}${h.branch ? '  @' + h.branch : ''}${h.sidechain ? '  (subagent)' : ''}`);
     console.log(`  ask: ${h.prompt}`);
-    console.log(`  hit: ${h.field}  cov ${h.coverage}  ${h.chunks} chunks  ${h.project}`);
+    console.log(`  hit: ${h.field}  cov ${h.coverage}  ${h.chunks} chunk${h.chunks === 1 ? '' : 's'}  ${h.project}`);
     console.log(`  ${h.snippet}`);
     console.log(`  ${h.resume}\n`);
   }

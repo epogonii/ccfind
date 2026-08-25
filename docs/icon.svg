@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="ccfind">
+  <title>ccfind</title>
+  <rect width="512" height="512" rx="112" fill="#1C1B22"/>
+  <rect x="4" y="4" width="504" height="504" rx="108" fill="none" stroke="#FFFFFF" stroke-opacity="0.09" stroke-width="8"/>
+
+  <!-- transcript lines -->
+  <g>
+    <rect x="104" y="132" width="232" height="26" rx="13" fill="#55555F"/>
+    <rect x="104" y="186" width="176" height="26" rx="13" fill="#CC785C"/>
+    <rect x="104" y="240" width="208" height="26" rx="13" fill="#55555F"/>
+  </g>
+
+  <!-- magnifier: dark halo first so the lens reads over the lines -->
+  <g fill="none" stroke-linecap="round">
+    <circle cx="306" cy="314" r="86" stroke="#1C1B22" stroke-width="54"/>
+    <line x1="366" y1="374" x2="428" y2="436" stroke="#1C1B22" stroke-width="58"/>
+    <line x1="366" y1="374" x2="428" y2="436" stroke="#CC785C" stroke-width="34"/>
+    <circle cx="306" cy="314" r="86" stroke="#F5F1EA" stroke-width="30"/>
+  </g>
+</svg>
