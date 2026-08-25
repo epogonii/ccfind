@@ -445,7 +445,8 @@ function search(query, opts = {}) {
   const limit = opts.limit ?? 10;
   const group = opts.group === 'exchange' ? 'exchange' : 'session';
   const { scores, hitFull, full, idfOf } = scoreDocs(idx, query);
-  const empty = { terms: full, hits: [], docsScored: 0, exchangesScored: 0, sessionsScored: 0 };
+  const empty = { terms: full, hits: [], relevant: 0, weak: 0, total: 0,
+                  docsScored: 0, exchangesScored: 0, sessionsScored: 0 };
   if (!scores.size) return empty;
 
   // --field restricts the search to that field rather than only requiring the
@@ -517,7 +518,27 @@ function search(query, opts = {}) {
     if (!firstOf.has(si)) firstOf.set(si, idx.exchanges[i]);
   }
 
-  const hits = groups.slice(0, limit).map((g) => {
+  // BM25 has no notion of "not relevant": every session holding one query word
+  // gets a score, so a 25-row list is one answer plus 24 sessions that happen to
+  // share the word "restart". The gate keeps the hits scoring within a fraction
+  // of the top one and hands back the rest as a count, so the caller states a
+  // measured number instead of eyeballing the table.
+  //
+  // 0.25 is where the sweep over 12 ground-truth queries settles: it drops 169
+  // of 173 irrelevant hits for 0.03 of P@3, where 0.3 buys two more of those
+  // 173 at 0.06. What it costs is always the same shape - a session that
+  // mentions the identifier once in passing, which grep-based ground truth
+  // scores as relevant and a reader does not. The top hit is exempt by
+  // construction: a search that matched something always answers with something.
+  const WEAK_BAR = 0.25;
+  let relevant = groups.length;
+  if (!opts.all && groups.length) {
+    const bar = groups[0].score * WEAK_BAR;
+    relevant = 1;
+    while (relevant < groups.length && groups[relevant].score >= bar) relevant++;
+  }
+
+  const hits = groups.slice(0, Math.min(limit, relevant)).map((g) => {
     const x = idx.exchanges[g.xi];
     const s = sessOf(g);
     const open = firstOf.get(g.si ?? idx.exchanges[g.xi].si);
@@ -546,7 +567,11 @@ function search(query, opts = {}) {
       resume: `claude --resume ${s.id}`,
     };
   });
-  return { terms: full, group, hits, total: groups.length, docsScored: scores.size,
+  // `total` stays what it always was - everything that matched after the
+  // filters - so a caller can still say how wide the field was. `relevant` is
+  // what survived the gate, `weak` what it cut.
+  return { terms: full, group, hits, relevant, weak: groups.length - relevant,
+           total: groups.length, docsScored: scores.size,
            exchangesScored: byX.size, sessionsScored: new Set(xRanked.map((g) => idx.exchanges[g.xi].si)).size };
 }
 
@@ -626,9 +651,13 @@ function human(res) {
   // caller cannot actually reach (the current session is excluded by default).
   const total = res.total ?? (res.group === 'session' ? res.sessionsScored : res.exchangesScored);
   const unit = res.group === 'session' ? 'session' : 'turn';
-  console.log(res.hits.length < total
-    ? `best ${res.hits.length} of ${total} matching ${unit}s:\n`
-    : `${total} matching ${unit}${total === 1 ? '' : 's'}:\n`);
+  // The gate already dropped the long tail, so the header counts what it kept:
+  // saying "best 4 of 61" when 57 of those 61 were one shared common word reads
+  // as a search that found plenty and showed little.
+  const rel = res.relevant ?? total;
+  console.log(res.hits.length < rel
+    ? `best ${res.hits.length} of ${rel} relevant ${unit}s:\n`
+    : `${rel} relevant ${unit}${rel === 1 ? '' : 's'}:\n`);
   let n = 0;
   for (const h of res.hits) {
     n++;
@@ -650,8 +679,11 @@ function human(res) {
     console.log(wrap(h.snippet, width - 5, '     '));
     console.log(`   open it:   ${h.open}${process.env.CLAUDECODE ? '' : `   (in a terminal: ${h.resume})`}\n`);
   }
-  const more = (res.total || res.hits.length) - res.hits.length;
-  if (more > 0) console.log(`${more} more matched but were not shown - re-run with --limit ${res.total}`);
+  // Two different numbers, so two lines: relevant hits that --limit cut off are
+  // worth re-running for, weak ones are worth knowing about but not printing.
+  const more = (res.relevant ?? res.total ?? res.hits.length) - res.hits.length;
+  if (more > 0) console.log(`${more} more relevant - re-run with --limit ${res.relevant}`);
+  if (res.weak > 0) console.log(`${res.weak} weak match${res.weak === 1 ? '' : 'es'} scored far below the top hit and were hidden - --all shows them`);
 }
 
 const args = parseArgs(process.argv.slice(2));
@@ -864,7 +896,7 @@ await import(pathToFileURL(target).href);
   if (!q) { console.error('usage: ccfind.mjs pick <query> [--limit N]'); process.exit(1); }
   let res;
   try {
-    res = search(q, { limit: args.limit ? +args.limit : 15, group: 'session' });
+    res = search(q, { limit: args.limit ? +args.limit : 15, group: 'session', all: !!args.all });
   } catch (e) { console.error(`ccfind: ${e.message}`); process.exit(1); }
   if (!res.hits.length) { console.error(`nothing matched: ${res.terms.join(' ')}`); process.exit(1); }
 
@@ -1001,7 +1033,7 @@ await import(pathToFileURL(target).href);
   if (!q) {
     console.error('usage: ccfind.mjs search <query> [--limit N] [--group session|exchange]');
     console.error('                              [--project S] [--session ID] [--days N] [--field F]');
-    console.error('                              [--exclude ID[,ID...]] [--self] [--json]');
+    console.error('                              [--exclude ID[,ID...]] [--self] [--all] [--json]');
     process.exit(1);
   }
   let res;
@@ -1020,6 +1052,9 @@ await import(pathToFileURL(target).href);
                                    process.env.CLAUDE_SESSION_ID || null]
                                   .map((s) => s && s.trim()).filter(Boolean),
       days: args.days ? +args.days : null,
+      // Everything BM25 scored, gate and all. For "did I ever mention X at all",
+      // where a single passing reference is the answer.
+      all: !!args.all,
     });
   } catch (e) {
     // A typo in a flag or a missing index is a usage problem, not a crash.

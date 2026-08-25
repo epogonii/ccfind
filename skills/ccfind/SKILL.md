@@ -67,6 +67,7 @@ user the `resume` command from the hit and let them jump there.
 | `--field title\|prompt\|answer\|thinking\|tool\|output\|summary` | search only that field |
 | `--exclude ID[,ID...]` | drop sessions from results |
 | `--self` | allow the current session to appear (it is excluded by default) |
+| `--all` | keep the weak matches the relevance gate hides |
 | `--json` | machine-readable output - use this |
 
 `show <id>` takes `--turns N` (default 40) and `--json`. It lists a session's user
@@ -80,7 +81,7 @@ the turn rather than the conversation.
 
 ```json
 {
-  "total": 8,
+  "relevant": 4, "weak": 19, "total": 23,
   "hits": [{
     "score": 22.65, "coverage": 1, "chunks": 160, "turns": 14,
     "title": "cluster-setup", "session": "a1b2c3d4-...", "project": "-home-me-infra",
@@ -106,8 +107,12 @@ the turn rather than the conversation.
   a 2-turn one is a question.
 - `open` is `/resume <id>` - typed in this window it switches to that session in
   place. `resume` is `claude --resume <id>`, which starts a separate run instead.
-- `total` (top level) is how many sessions matched, which is usually more than
-  `--limit` returned.
+- `relevant`, `weak` and `total` (top level). BM25 scores every session holding
+  a single query word, so `total` is wide and mostly noise. The relevance gate
+  keeps the hits scoring within 30% of the top one - `relevant` - and hides the
+  rest as `weak`. `hits` therefore never exceeds `relevant`, and the top hit is
+  always kept. `--all` returns the whole tail if the user wants the mentions
+  themselves.
 
 ## Answering
 
@@ -156,18 +161,22 @@ Rules:
   switches to that session in place. That is what the user means by "open it",
   so it is the line that must be easy to find. `claude --resume` (the `resume`
   field) is the terminal variant - mention it only if they are in a terminal.
-- the withheld count goes on its own plain line when `total` exceeds the rows.
-- report `total` as it comes back. If you narrow it further yourself - only the
-  `coverage: 1` hits, only one project - give both numbers (`8 of 23 with every
-  word`), because a bare "8 sessions" hides the 15 the user never learns about.
+- the withheld count goes on its own plain line when `relevant` exceeds the rows.
+- **the two counts are already computed - use them, do not restate them in
+  prose.** One line after the table: `4 relevant of 23 matched; 19 were weak`.
+  Never write your own verdict on the weak ones ("the rest are partial matches",
+  "only #1 covers every word") - the gate measured that, and a sentence guessing
+  at it from the table is a guess. If you narrow the rows further yourself - only
+  one project, only `coverage: 1` - say so with both numbers, because a bare
+  "4 sessions" hides the ones the user never learns about.
 - **Answer in the user's language, whatever it is.** This file is written in
   English and its examples are English; that is the file's language, not a
   default for the answer. Match the language of their own messages and answer
   wholly in it - table headers, the recommendation, the picker options.
 - keep whatever output style the session is running. A terse style stays terse
   here too - the table stays a table either way.
-- if `coverage` is well below 1 on every hit, one line saying the match is weak
-  beats a confident guess.
+- if `coverage` is well below 1 on every hit, or `relevant` is 1 with a large
+  `weak`, one line saying the match is thin beats a confident guess.
 
 ## Letting the user pick
 

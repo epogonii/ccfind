@@ -134,6 +134,18 @@ the work. Demoting them removed 46 more phantom turns.
 corroborating chunks add a capped bonus, and coverage of the words you typed
 multiplies the result. So a long noisy session cannot out-sum a short precise one.
 
+**A relevance gate cuts the tail.** BM25 scores every session that holds a single
+word of your query, so a raw ranking of "coredns replicas" is one answer and
+thirty sessions that once printed the word *replicas*. Hits scoring under 25% of
+the top one are dropped and reported as a count - `31 matched, 6 relevant, 25
+weak` - and `--all` brings them back for when a passing mention is what you
+want. Swept over the twelve benchmark queries on a corpus since grown to 94
+transcripts - where the ungated P@3 is 0.92, not the 0.89 the table below
+measured on 78 - the 0.25 bar removes 169 of 173 irrelevant hits and costs 0.03
+of P@3; what it costs is always a session that
+mentions the identifier once, which grep-based ground truth counts as relevant
+and a reader does not. The top hit is never gated.
+
 ## Measured
 
 Corpus: 78 transcripts, 90 MB, 657 exchanges, 20,729 chunks, 78,766 terms.
@@ -268,6 +280,7 @@ conversation: nothing can switch the active session from inside it.
 | `--field title\|prompt\|answer\|thinking\|tool\|output\|summary` | search only that field |
 | `--exclude ID[,ID...]` | drop sessions from results |
 | `--self` | include the current session (excluded by default) |
+| `--all` | keep the weak matches the gate hides |
 | `--json` | machine-readable output |
 | `--turns N` | `show` only: how many turns to print (default 40) |
 
