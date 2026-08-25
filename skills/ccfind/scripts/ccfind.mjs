@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ccfind - BM25 full-text search over local Claude Code transcripts.
-// Subcommands: index, search, stats, bench
+// Subcommands: index, search, show, open, pick, stats, bench, install, uninstall
 // No network calls. Reads ~/.claude/projects/*/*.jsonl, writes ~/.claude/ccfind/.
 
 import fs from 'node:fs';
@@ -445,7 +445,7 @@ function search(query, opts = {}) {
   const limit = opts.limit ?? 10;
   const group = opts.group === 'exchange' ? 'exchange' : 'session';
   const { scores, hitFull, full, idfOf } = scoreDocs(idx, query);
-  const empty = { terms: full, hits: [], relevant: 0, weak: 0, total: 0,
+  const empty = { terms: full, group, hits: [], relevant: 0, weak: 0, total: 0,
                   docsScored: 0, exchangesScored: 0, sessionsScored: 0 };
   if (!scores.size) return empty;
 
@@ -612,6 +612,13 @@ function parseArgs(argv) {
   return o;
 }
 
+// A count flag that fails to parse falls back to the default instead of
+// poisoning a slice with NaN ("--limit abc" silently showing zero hits).
+function posInt(v, dflt) {
+  const n = Math.floor(+v);
+  return Number.isFinite(n) && n > 0 ? n : dflt;
+}
+
 // Plain-text output is what a first-time reader sees, so it spells things out:
 // where the session lived, the words the user themselves used, and which part of
 // the conversation the match landed in. --json carries the raw numbers.
@@ -716,7 +723,7 @@ if (cmd === 'index') {
   const turns = idx.exchanges
     .map((x, i) => ({ ...x, i }))
     .filter((x) => x.si === si && x.t && x.t !== '(session start)');
-  const cap = args.turns ? +args.turns : 40;
+  const cap = args.turns ? posInt(args.turns, 40) : 40;
   const shown = turns.slice(0, cap);
   if (args.json) {
     console.log(JSON.stringify({
@@ -893,10 +900,10 @@ await import(pathToFileURL(target).href);
   // over the screen, so this is the only place where "select it and open it" can
   // literally mean that: Enter hands the terminal to `claude --resume`.
   const q = args._.slice(1).join(' ');
-  if (!q) { console.error('usage: ccfind.mjs pick <query> [--limit N]'); process.exit(1); }
+  if (!q) { console.error('usage: ccfind.mjs pick <query> [--limit N] [--all]'); process.exit(1); }
   let res;
   try {
-    res = search(q, { limit: args.limit ? +args.limit : 15, group: 'session', all: !!args.all });
+    res = search(q, { limit: posInt(args.limit, 15), group: 'session', all: !!args.all });
   } catch (e) { console.error(`ccfind: ${e.message}`); process.exit(1); }
   if (!res.hits.length) { console.error(`nothing matched: ${res.terms.join(' ')}`); process.exit(1); }
 
@@ -1039,7 +1046,7 @@ await import(pathToFileURL(target).href);
   let res;
   try {
     res = search(q, {
-      limit: args.limit ? +args.limit : 10,
+      limit: posInt(args.limit, 10),
       group: typeof args.group === 'string' ? args.group : 'session',
       project: typeof args.project === 'string' ? args.project : null,
       session: typeof args.session === 'string' ? args.session : null,
@@ -1047,10 +1054,12 @@ await import(pathToFileURL(target).href);
       // The session doing the searching is never the answer to its own question.
       // Comma-separated so a caller can drop several known-irrelevant sessions at
       // once (a benchmark excluding its own scratch runs, a retry of a bad session).
-      exclude: args.self ? null : [...(typeof args.exclude === 'string' ? args.exclude.split(',') : []),
-                                   process.env.CLAUDE_CODE_SESSION_ID || null,
-                                   process.env.CLAUDE_SESSION_ID || null]
-                                  .map((s) => s && s.trim()).filter(Boolean),
+      // --self lifts only the automatic self-exclusion; an explicit --exclude
+      // list stays honored either way.
+      exclude: [...(typeof args.exclude === 'string' ? args.exclude.split(',') : []),
+                ...(args.self ? [] : [process.env.CLAUDE_CODE_SESSION_ID || null,
+                                      process.env.CLAUDE_SESSION_ID || null])]
+               .map((s) => s && s.trim()).filter(Boolean),
       days: args.days ? +args.days : null,
       // Everything BM25 scored, gate and all. For "did I ever mention X at all",
       // where a single passing reference is the answer.

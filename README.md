@@ -48,7 +48,8 @@ table, which one to open, and the `/resume` line that switches this window to it
 </p>
 
 **In a terminal** - `ccfind pick "<query>"`, arrows or the mouse over every hit,
-Enter hands the terminal to `claude --resume`:
+Enter hands the terminal to `claude --resume`. The `ccfind` command is a one-time
+`install` away - no alias, see [Terminal command](#terminal-command):
 
 <p align="center">
   <img src="docs/demo-term.gif" alt="ccfind pick in a terminal: an arrow-key list of matching sessions" width="100%">
@@ -56,6 +57,14 @@ Enter hands the terminal to `claude --resume`:
 
 <sub>Both recordings run against a synthetic history, so nothing private appears
 in them. The numbers under [Measured](#measured) come from a real 90 MB corpus.</sub>
+
+## Prerequisites
+
+- **Node 18+ on `PATH`** - the only requirement. Claude Code's native installer
+  does not ship a Node runtime, so check with `node -v`; any install method
+  (nvm, brew, apt, nodejs.org) works.
+- macOS or Linux. Windows is untested.
+- Nothing else: no npm packages, no network, no API keys, no build step.
 
 ## Install
 
@@ -73,10 +82,6 @@ claude plugin marketplace add epogonii/ccfind
 claude plugin install ccfind@ccfind
 ```
 
-Needs **Node 18+** on `PATH` and nothing else - no npm install, no dependencies,
-no network, no API keys. Claude Code's native installer does not ship a Node
-runtime, so run `node -v` first if the skill reports it cannot start. macOS and
-Linux; Windows is untested.
 
 ## Using it
 
@@ -233,11 +238,16 @@ node skills/ccfind/scripts/ccfind.mjs pick "registry mirror"      # arrow-key pi
 node skills/ccfind/scripts/ccfind.mjs bench "q1" "q2"             # latency per query
 ```
 
+### Terminal command
+
 `ccfind` is not on your PATH out of the box - the plugin ships a script, not a
-binary. One command fixes that, no alias to write:
+binary. One command fixes that, no alias to write. The simplest way is to ask
+Claude Code itself: *"run ccfind install"*. From a plain terminal, point Node at
+the installed plugin (any cached version works - the launcher resolves the
+current one at run time):
 
 ```bash
-node "$CLAUDE_PLUGIN_ROOT/skills/ccfind/scripts/ccfind.mjs" install
+node "$(ls -d ~/.claude/plugins/cache/*/ccfind/*/skills/ccfind/scripts/ccfind.mjs | tail -1)" install
 ```
 
 It writes a small launcher into the first writable directory already on your PATH
