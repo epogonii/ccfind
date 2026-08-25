@@ -3,6 +3,31 @@
 All versions are dated 2026-08-25: the project went from first commit to the
 plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.15.2
+
+- Fixed: closing a window that `open` had launched killed the session without the
+  confirmation every other window of the same terminal shows. The launch ran
+  `sh -lc "cd ... && claude --resume <id>"`, and a shell handed `-c` replaces
+  itself with the last command instead of forking it, so `claude` became the
+  terminal's own process. Emulators that offer to confirm closing - ptyxis,
+  gnome-terminal, konsole - look for a child process still running, found none,
+  and closed on the first click. The command now ends in `; exit $?`, which keeps
+  the shell above `claude` where those emulators look; the exit status is still
+  `claude`'s.
+
+- Docs: the indexing cost was wrong everywhere it was stated. `README.md` and the
+  skill both claimed a full rebuild of a 90 MB corpus took about 2 seconds, an
+  implied 45 MB/s that does not hold. Measured on a 250 MB history of 93
+  transcripts: a full rebuild takes about 19 s, roughly 13 MB/s. Two related
+  claims were wrong with it - a cold search is 1.2 s on that history rather than
+  the benchmark corpus's 133 ms, because the figure is dominated by reading the
+  index back and this index is 9.3 MB rather than 3.9 MB; and an unchanged corpus
+  is not skipped "instantly", since the skip still starts a process, stats every
+  transcript and loads the index, costing about as much as a search. The skill now
+  states the throughput instead of a single total, and tells the model to say the
+  indexing step is running when the history is large, rather than leaving a tool
+  call that looks stuck. No behaviour change.
+
 ## 0.15.1
 
 - Fixed: a session opened by `open` stopped saving its transcript. The terminal

@@ -37,12 +37,15 @@ If either command fails with `node: command not found`, stop and tell the user
 that ccfind needs Node 18+ on `PATH` and that Claude Code's native installer
 does not provide it. Do not fall back to reading transcripts by hand.
 
-`index` is idempotent and cheap: it prints `index up to date` and exits when
-nothing changed, and a full rebuild of a 90 MB corpus takes about 2 seconds.
-Inside a live session the current transcript is always growing, so that skip
-will rarely fire and each search normally pays the ~2 s rebuild once.
-Always run it before searching so a conversation from ten minutes ago is
-findable. Then read the JSON from `search` and answer from it.
+`index` is idempotent: it prints `index up to date` and exits when nothing
+changed. It is not free. Any change rebuilds the whole corpus at roughly
+13 MB/s - a second or two for a small history, about 19 s for 250 MB - and inside
+a live session the current transcript is always growing, so that skip rarely
+fires and each search pays the rebuild once. Run it before searching anyway, so a
+conversation from ten minutes ago is findable; on a large history the call takes
+tens of seconds, so say the indexing step is running rather than leaving the user
+with a tool call that looks stuck. Then read the JSON from `search` and answer
+from it.
 
 ## Cost
 

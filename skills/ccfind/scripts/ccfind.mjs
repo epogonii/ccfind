@@ -253,8 +253,9 @@ async function buildIndex({ full = false, quiet = false } = {}) {
     }
     _index = null;
   }
-  // v0.1 rebuilds whole corpus on any change: 90 MB takes ~2 s, and a correct
-  // incremental merge is only worth writing once the on-disk format settles.
+  // v0.1 rebuilds whole corpus on any change: roughly 13 MB/s measured, and a
+  // correct incremental merge is only worth writing once the on-disk format
+  // settles.
 
   const docsFd = fs.openSync(DOCS, 'w');
   const state = {};
@@ -883,7 +884,15 @@ await import(pathToFileURL(target).href);
   const ses = idx.sessions.find((x) => x.id.startsWith(want));
   if (!ses) { console.error(`ccfind: no session starting with ${want}`); process.exit(1); }
   const cwd = ses.cwd && fs.existsSync(ses.cwd) ? ses.cwd : HOME;
-  const inner = `cd ${JSON.stringify(cwd)} && claude --resume ${ses.id}`;
+  // The trailing `exit $?` is not redundant. A shell handed `-c` replaces itself
+  // with the last command rather than forking it, so without it `claude` *becomes*
+  // the terminal's own process. Emulators that offer to confirm closing a window -
+  // ptyxis, gnome-terminal, konsole - decide that by looking for a child process
+  // still running: they find none, and the first click on the close button kills
+  // the resumed session with no prompt, while every other window of the same
+  // terminal asks. Keeping the shell alive puts `claude` back where those
+  // emulators look, and the exit status still comes from `claude`.
+  const inner = `cd ${JSON.stringify(cwd)} && claude --resume ${ses.id}; exit $?`;
 
   // Ordered by how little it surprises the user: their own multiplexer first,
   // then the terminal they are actually in, then anything installed.

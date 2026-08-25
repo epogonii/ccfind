@@ -240,6 +240,13 @@ const DARWIN = process.platform === 'darwin';
 r = run(['open', RECENT], { CCFIND_OPEN_DRYRUN: '1' });
 const ladder = r.out.trim().split('\n');
 ok('every candidate runs the resume command', ladder.every((l) => l.includes('claude --resume')), r.out);
+// A shell given `-c` execs the last command instead of forking it, which would
+// make `claude` the terminal's own process - and a terminal that confirms closing
+// a window with something still running looks for a child, finds none, and closes
+// on the first click without asking. The trailing builtin keeps the shell alive so
+// that prompt appears for a resumed session too.
+ok('the resume command keeps a shell above it so closing the window still prompts',
+   ladder.every((l) => /claude --resume [^"]*; exit \$\?/.test(l)), r.out);
 if (LINUX) {
   ok('the ladder starts with the freedesktop dispatcher', /^"xdg-terminal-exec"/.test(ladder[0]), ladder[0]);
   ok('the ladder knows the current GNOME terminal', r.out.includes('"ptyxis"'), r.out);

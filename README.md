@@ -218,10 +218,17 @@ reports itself as `claude-historian` 1.0.0 either way.
 
 **Latency.** ccfind's 133 ms is a cold `node` process: interpreter start plus
 loading the 3.9 MB index. The query itself takes 0-3 ms once the index is in
-memory. Indexing 90 MB from scratch takes about 2 seconds; an unchanged corpus is
-detected and skipped instantly - though inside a live session your current
-transcript is always growing, so a search from within Claude Code normally pays
-the rebuild.
+memory, so that figure is really the cost of reading the index back, and it grows
+with the corpus: on a 250 MB history of 93 transcripts, whose index is 9.3 MB
+gzipped, the same cold search takes about 1.2 s.
+
+**Indexing** is the slow half, because any change rebuilds everything. That
+250 MB history rebuilds in about 19 s - roughly 13 MB/s, which is the number to
+plan against rather than any one total. A corpus with nothing changed is detected
+and skipped, but the skip still starts a process, stats every transcript and reads
+the index back, so it costs about as much as a search: 1.3 s on that history, not
+nothing. Inside a live session your current transcript is always growing, so a
+search from within Claude Code normally pays the whole rebuild.
 
 </details>
 
@@ -335,8 +342,9 @@ Delete the directory to reset. Nothing else is written, anywhere.
 
 ## Limits
 
-- Any change to any transcript triggers a full rebuild. At ~2 s per 90 MB that is
-  fine; true incremental merge lands once the on-disk format settles.
+- Any change to any transcript triggers a full rebuild, at roughly 13 MB/s: a
+  second or two for a small history, about 19 s for 250 MB. True incremental merge
+  lands once the on-disk format settles.
 - BM25 is lexical. A query sharing no words with the conversation will not match
   it - there are no embeddings and no API calls.
 - Terms appearing in more than 40% of chunks are dropped from the index.
