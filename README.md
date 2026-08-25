@@ -228,6 +228,17 @@ it, because Claude Code unpacks every version into its own
 `~/.claude/plugins/cache/<marketplace>/ccfind/<version>/` directory. `uninstall`
 removes the launcher, and refuses to touch a file it did not write.
 
+`open <id>` launches a new terminal window on one session - `claude --resume` in
+that session's own working directory. It uses your multiplexer or terminal, in
+this order: a `tmux` window if `$TMUX` is set, iTerm or Terminal on macOS,
+`$TERMINAL` / `x-terminal-emulator` / gnome-terminal / konsole / kitty / wezterm
+/ alacritty / xterm on Linux. `CCFIND_OPEN_DRYRUN=1` prints what it would run.
+If none of them work it falls back to telling you the `/resume` line.
+
+Inside a Claude Code session, `/resume <id>` is the other half: that built-in
+slash command switches the window you type it in, rather than opening a second
+one.
+
 `pick` is the one that answers "let me choose it and open it": up and down move,
 Enter hands the terminal to `claude --resume` for the highlighted session, `q`
 quits. It needs a real terminal - piped or captured, it falls back to printing the

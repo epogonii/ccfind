@@ -25,4 +25,6 @@ means. Do not read
 any `*.jsonl` files directly.
 
 Then offer the top three through `AskUserQuestion` plus a "show all N" option,
-and run `show <id> --json` on whichever is picked.
+and on whichever is picked run both `show <id> --json` (to answer from it) and
+`open <id>` (which launches a new terminal window on that session). End with
+`/resume <id>`, the built-in command that switches this window instead.

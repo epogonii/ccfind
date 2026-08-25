@@ -790,6 +790,60 @@ await import(pathToFileURL(target).href);
       console.log('run it as: ccfind pick "<query>"');
     }
   }
+} else if (cmd === 'open') {
+  // "Open it" for real. `/resume <id>` switches the window it is typed in, but
+  // nothing a plugin can call switches the active session, so the only honest
+  // way to open a session from inside one is a new terminal window running
+  // `claude --resume`. Working directory is the session's own cwd, so relative
+  // paths in it still mean what they meant.
+  const want = args._[1];
+  if (!want) { console.error('usage: ccfind.mjs open <session-id>'); process.exit(1); }
+  const idx = readIndex();
+  if (!idx) { console.error('no index - run: ccfind.mjs index'); process.exit(1); }
+  const ses = idx.sessions.find((x) => x.id.startsWith(want));
+  if (!ses) { console.error(`ccfind: no session starting with ${want}`); process.exit(1); }
+  const cwd = ses.cwd && fs.existsSync(ses.cwd) ? ses.cwd : HOME;
+  const inner = `cd ${JSON.stringify(cwd)} && claude --resume ${ses.id}`;
+
+  // Ordered by how little it surprises the user: their own multiplexer first,
+  // then the terminal they are actually in, then anything installed.
+  const emulators = () => {
+    if (process.env.TMUX) return [['tmux', ['new-window', '-n', 'ccfind', 'sh', '-lc', inner]]];
+    if (process.platform === 'darwin') {
+      const app = process.env.TERM_PROGRAM === 'iTerm.app' ? 'iTerm' : 'Terminal';
+      const script = app === 'iTerm'
+        ? `tell application "iTerm" to tell current window to create tab with default profile command "sh -lc ${inner.replace(/["\\]/g, '\\$&')}"`
+        : `tell application "Terminal" to do script ${JSON.stringify(inner)}`;
+      return [['osascript', ['-e', script]], ['osascript', ['-e', `tell application "Terminal" to do script ${JSON.stringify(inner)}`]]];
+    }
+    const linux = [['x-terminal-emulator', ['-e', 'sh', '-lc', inner]],
+                   ['gnome-terminal', ['--', 'sh', '-lc', inner]],
+                   ['konsole', ['-e', 'sh', '-lc', inner]],
+                   ['kitty', ['sh', '-lc', inner]],
+                   ['wezterm', ['start', '--', 'sh', '-lc', inner]],
+                   ['alacritty', ['-e', 'sh', '-lc', inner]],
+                   ['xterm', ['-e', 'sh', '-lc', inner]]];
+    return process.env.TERMINAL ? [[process.env.TERMINAL, ['-e', 'sh', '-lc', inner]], ...linux] : linux;
+  };
+
+  if (process.env.CCFIND_OPEN_DRYRUN) {
+    for (const [c, a] of emulators()) console.log([c, ...a].map((x) => JSON.stringify(x)).join(' '));
+    process.exit(0);
+  }
+  let opened = null;
+  for (const [c, a] of emulators()) {
+    const r = spawnSync(c, a, { stdio: 'ignore' });
+    if (!r.error && (r.status === 0 || r.status === null)) { opened = c; break; }
+  }
+  if (opened) {
+    console.log(`opened ${ses.title || ses.id.slice(0, 8)} in a new ${opened} window`);
+    console.log(`  ${cwd}`);
+  } else {
+    console.error('ccfind: could not open a terminal window here.');
+    console.error(`switch this window instead:  /resume ${ses.id}`);
+    console.error(`or run:  ${inner}`);
+    process.exit(1);
+  }
 } else if (cmd === 'pick') {
   // Arrow-key picker for a real terminal. Inside Claude Code a skill cannot take
   // over the screen, so this is the only place where "select it and open it" can

@@ -19,6 +19,7 @@ Everything happens in one Node process. Two commands, in this order.
 node <skill-dir>/scripts/ccfind.mjs index
 node <skill-dir>/scripts/ccfind.mjs search "<query>" --limit 12 --json
 node <skill-dir>/scripts/ccfind.mjs show <session-id> --json      # one session's turns
+node <skill-dir>/scripts/ccfind.mjs open <session-id>             # new window on it
 ```
 
 `pick "<query>"` also exists: an arrow-key list that runs `claude --resume` on
@@ -182,10 +183,22 @@ session concluded about the thing they asked, and where in it that sits. Then
 they can keep asking about it here, which is the point: the session's content is
 now in this conversation.
 
-Then, always, the last line: **`/resume <id>`** for the session they picked.
-A skill cannot type it for them - no tool switches the active session - but that
-one line does, in this same window, and it is what "open it" means. So: pull the
-content in here *and* hand them the line. Never end a pick without it. Arrow keys over *every* hit, with Enter that really hands the
+Then **open it**, because that is what picking is for. Two things, both:
+
+```bash
+node <skill-dir>/scripts/ccfind.mjs open <session-id>
+```
+
+`open` launches a new terminal window on that session (`claude --resume`, in the
+session's own cwd - tmux window if they are in tmux, iTerm/Terminal on macOS, the
+installed emulator on Linux). Run it right after the pick; say which window
+opened, in one clause.
+
+And still give the last line: **`/resume <id>`**. That is the built-in slash
+command; typed in *this* window it switches this conversation to that session
+instead of opening a second one. A skill cannot type it for them - no tool
+switches the active session - so hand them the line every time. `open` for a new
+window, `/resume` to switch here: never end a pick without both. Arrow keys over *every* hit, with Enter that really hands the
 terminal to `claude --resume`, exist in one place only: `ccfind pick "<query>"`
 in a terminal. Recommend it when the list is long.
 
