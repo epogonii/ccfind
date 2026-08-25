@@ -109,7 +109,7 @@ the turn rather than the conversation.
   place. `resume` is `claude --resume <id>`, which starts a separate run instead.
 - `relevant`, `weak` and `total` (top level). BM25 scores every session holding
   a single query word, so `total` is wide and mostly noise. The relevance gate
-  keeps the hits scoring within 30% of the top one - `relevant` - and hides the
+  keeps the hits scoring within 25% of the top one - `relevant` - and hides the
   rest as `weak`. `hits` therefore never exceeds `relevant`, and the top hit is
   always kept. `--all` returns the whole tail if the user wants the mentions
   themselves.
@@ -121,16 +121,20 @@ Terse, and legible in a terminal. The question is *which session*.
 A markdown table, one row per hit. The headers are what makes it readable - a
 bare column of numbers leaves the user guessing what `169` meant.
 
-| # | Session | Date | Project | id | Asked | Matched |
+| # | Session | Date | Project | id | Requests | Matched |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | registry mirror | 08-06 | infra | `a1b2c3d4` | 169 | "containerd ignores the mirror" |
 | 2 | node bootstrap | 08-06 | infra | `b2c3d4e5` | 6 | "kubelet never registers, cert ..." |
 | 3 | secret sync | 08-05 | infra | `c3d4e5f6` | 30 | "'API_TOKEN', 'BROKER_URL' mis..." |
 
-`Asked` is the `turns` field: how many times the user wrote into that session.
-Translate the headers when answering in another language, and translate them -
-never transliterate. An English header respelled in the user's alphabet is not a
-word in their language and tells them nothing; the real word for it is.
+`Requests` is the `turns` field: how many things the user asked for in that
+session. Translate the headers when answering in another language, and translate
+them - never transliterate. An English header respelled in the user's alphabet is
+not a word in their language and tells them nothing; the real word for it is.
+Every header names the thing a column counts, so it stays a noun: a past
+participle - `Asked` turned into Russian as "Спрошено" - reads as a verb about
+nobody and leaves the user guessing what the numbers are. The word for
+"requests" is what that column means.
 
 Rules:
 

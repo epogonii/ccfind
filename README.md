@@ -1,7 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.png">
-    <img alt="ccfind" src="docs/logo-light.png" width="380">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg">
+    <source srcset="docs/logo-light.svg">
+    <img alt="ccfind" src="docs/logo-light.png" width="424">
   </picture>
 </p>
 
