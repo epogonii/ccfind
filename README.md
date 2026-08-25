@@ -1,25 +1,60 @@
-# ccfind
+<h1 align="center">ccfind</h1>
 
-Full-text search across your past Claude Code sessions.
+<p align="center">
+  <b>Full-text search across your past Claude Code sessions.</b><br>
+  Finds the conversation where something was actually discussed — and hands you the command to resume it.
+</p>
 
-Claude Code keeps every conversation on disk in `~/.claude/projects/*.jsonl`, but
-nothing in the CLI searches it. `--resume` matches a session by id or name,
-`/insights` writes a report, and `/find` searches a web page in Chrome. None of
-them answers "which session was the one where we fixed the containerd registry
-config?"
+<p align="center">
+  <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
+  <img alt="dependencies" src="https://img.shields.io/badge/dependencies-0-brightgreen">
+  <img alt="network" src="https://img.shields.io/badge/network-none-brightgreen">
+  <img alt="runtime" src="https://img.shields.io/badge/node-%E2%89%A518-informational">
+  <img alt="P@1" src="https://img.shields.io/badge/P%401-0.92-success">
+</p>
 
-`ccfind` indexes those transcripts and ranks them with BM25, then hands Claude a
-small JSON result with the session, the user turn the match hangs off, the
-matching snippet, and a ready `claude --resume <id>` command.
+---
 
-Everything runs locally. No network calls, no API calls, no data leaves the
-machine.
+## The problem
+
+Claude Code writes every session to disk in `~/.claude/projects/*.jsonl`. Nothing
+in the CLI searches it.
+
+`--resume` matches a session by id or name. `/insights` writes a report. `/find`
+searches a web page in Chrome. None of them answers the only question you
+actually have:
+
+> *Which session was the one where we fixed the registry config?*
+
+So you solve it again. The transcript was on disk the whole time.
+
+## What you get
+
+```console
+$ /ccfind why did the node take so long to reboot
+
+Session "cluster-setup", 2026-07-28 — score 34.2, coverage 1
+
+  ask:  reboots on the workers hang for minutes, find out why
+  hit:  output · 12 chunks
+
+  > Failed to start node shutdown manager: timed out after 5 attempts
+  > waiting for logind InhibitDelayMaxSec to update to 2m0s, current 30s
+
+  Cause: a drop-in from unattended-upgrades overrode the setting.
+
+  claude --resume a1b2c3d4-5e6f-7890-abcd-ef1234567890
+```
+
+Not "here are some related conversations". The session, the turn you asked it in,
+the line that mattered, and one command to be back inside that context with the
+full history — not a summary of it.
 
 ## Requirements
 
-Node 18 or newer on `PATH`. Nothing else - no npm install, no dependencies, no
-network. Claude Code's native installer does not ship a Node runtime, so check
-`node -v` first if the skill reports it cannot run.
+Node 18 or newer on `PATH`. Nothing else — no npm install, no dependencies, no
+network, no API keys. Claude Code's native installer does not ship a Node
+runtime, so run `node -v` first if the skill reports it cannot start.
 
 ## Install
 
@@ -28,143 +63,154 @@ network. Claude Code's native installer does not ship a Node runtime, so check
 /plugin install ccfind
 ```
 
-Then just ask, or use the command:
+Then ask in your own words, or use the command:
 
 ```
 /ccfind containerd registry config
 ```
 
-Claude also reaches for it on its own when you say things like "where did we
-already do this", "which session was that", or "search my history".
+Claude also reaches for it unprompted on things like *"where did we already do
+this"*, *"which session was that"*, *"we fixed this before"*, *"search my
+history"*.
 
-## What it indexes
+## How it works
 
-Each transcript is split into ~1 KB chunks, tokenised, and scored per field:
+Every transcript is split into ~1 KB chunks, tokenised, and scored per field —
+because *where* a word appears says a lot about whether it answers your question.
 
-| Field | Weight | Content |
-| --- | --- | --- |
-| `title` | 3.5 | session name, from `/rename` or the model-written one |
-| `prompt` | 3.0 | what you typed |
+| Field | Weight | What it is |
+| --- | :---: | --- |
+| `title` | 3.5 | session name, from `/rename` or model-written |
+| `prompt` | 3.0 | what **you** typed |
 | `answer` | 1.5 | Claude's replies |
 | `tool` | 1.0 | tool calls and their arguments |
 | `thinking` | 0.7 | reasoning blocks |
 | `output` | 0.5 | tool results, up to 16 KB each |
 | `summary` | 0.4 | compaction summaries |
 
-A hit in a question you asked outranks a hit in scrollback from a `grep` that
-happened to print the same word. Identifiers are indexed both whole and split,
-so `certs.d`, `kube-vip`, and `InhibitDelayMaxSec` are all findable, whole or by
-their parts - but the compound you typed always outranks its pieces.
+A hit in a question you asked outranks the same word in scrollback from a `grep`
+that happened to print it.
 
-Injected context is stripped before indexing: system reminders, hook output, and
-slash-command wrappers are not conversation, and indexing them as prompts ranks
-boilerplate above real questions. The same goes for turns Claude Code marks
-`isMeta` - the body of a skill the model loaded, the "messages below were
-generated by the user" caveat, an image-cache path - which were 145 of 969 user
-turns in the test corpus, and cost 108 phantom exchanges. Only the wrapper of a
-slash command is dropped, never its arguments: in `/ccfind где мы разбирались с
-coredns` the words after the command are the question. Images, encrypted
-payloads, and thinking signatures are skipped.
+**Identifiers are indexed whole and split**, so `certs.d`, `kube-vip` and
+`InhibitDelayMaxSec` are all findable either way — but the compound you typed
+always outranks its pieces.
 
-Compaction summaries get their own field at the lowest weight. Claude writes
+**Injected context is stripped.** System reminders, hook output, slash-command
+wrappers and turns Claude Code marks `isMeta` — a loaded skill's own body, the
+"messages below were generated by the user" caveat, an image-cache path — are not
+conversation. Indexed as prompts they rank boilerplate above real questions. That
+was 145 of 969 user turns in the test corpus, and 108 phantom exchanges. What is
+*not* stripped is a slash command's arguments: in `/ccfind where did we set the
+gc threshold`, the words after the command are the question.
+
+**Compaction summaries get their own field at the lowest weight.** Claude writes
 them, you did not ask them, and they restate every topic of the session they
-replace - indexed as prompts they let a continuation outrank the session that
-did the work, and they supply the shown "ask" line. Demoting them removed 46
-phantom user turns from this corpus.
+replace — indexed as prompts they let a continuation outrank the session that did
+the work. Demoting them removed 46 more phantom turns.
 
-Chunk scores roll up to the user turn, then to the session. The best chunk
-dominates, corroborating chunks add a capped bonus, and coverage of the words
-you typed multiplies - so a long noisy session cannot out-sum a short precise
-one.
+**Scores roll up twice**: chunk → your turn → session. The best chunk dominates,
+corroborating chunks add a capped bonus, and coverage of the words you typed
+multiplies the result. So a long noisy session cannot out-sum a short precise one.
 
 ## Measured
 
-Corpus: 78 transcripts, 90.6 MB, 657 exchanges, 20,729 chunks, 78,766 terms.
+Corpus: 78 transcripts, 90 MB, 657 exchanges, 20,729 chunks, 78,766 terms.
 Index 3.9 MB gzipped plus a 13 MB chunk store.
 
 Twelve queries, each a natural-language phrasing containing one distinctive
 identifier. Ground truth is a literal `grep -F` for that identifier across the
-corpus, so relevance is checkable rather than asserted. `claude-historian-mcp`
-1.0.3 - the current name of `claude-historian`, which is deprecated in favour of
-it - is the existing MCP server for the same job, and is measured on the same
-corpus and the same queries. It is given a result limit of 8 against ccfind's 5,
-so the comparison is not tilted by list length.
+corpus, so relevance is checkable rather than asserted.
+
+|  | P@1 | P@3 | MRR | latency | identifier in results | resumable id |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **ccfind** | **0.92** | **0.89** | **0.96** | 133 ms | **12/12** | yes |
+| claude-historian-mcp 1.0.3 | 0.00 | 0.00 | 0.00 | 9 ms | 0/12 | no |
+
+`claude-historian-mcp` is the existing MCP server for this job, measured on the
+same corpus and the same queries, and given a result limit of 8 against ccfind's
+5 so the comparison is not tilted by list length.
+
+<details>
+<summary><b>Method, and everything that went wrong with it</b></summary>
 
 Three transcripts are excluded from both engines and from the ground truth: the
 session that ran the benchmark, and the two the benchmark itself produced (an
 end-to-end plugin test and an MCP probe). All three contain ccfind's own answers,
-so leaving them in lets an engine score by quoting the answer back. That is not a
-hypothetical - it is what the first run of this benchmark did, and the fix cost
+so leaving them in lets an engine score by quoting the answer back. That is not
+hypothetical — it is what the first run of this benchmark did, and fixing it cost
 `claude-historian-mcp` a spurious 0.33 P@1.
 
-|  | P@1 | P@3 | MRR | latency | identifier present in results | resumable session id |
-| --- | --- | --- | --- | --- | --- | --- |
-| **ccfind** | **0.92** | **0.89** | **0.96** | 133 ms | **12/12** | yes |
-| claude-historian-mcp 1.0.3 | 0.00 | 0.00 | 0.00 | 10 ms | 0/12 | no |
+**The table measures whether an engine answers the question asked.** It is not a
+claim of beating `grep -rl`, which scores 1.00 by construction — the ground truth
+*is* grep. What grep does not do is rank 78 transcripts, tell you which turn a
+match belongs to, or hand back a session to resume. It also reads 90 MB per query
+where ccfind reads a 3.9 MB index.
 
-What this table measures is whether an engine answers the question that was
-asked. It is not a claim of beating `grep -rl`, which scores 1.00 by
-construction: the ground truth is defined by grep. What grep does not do is rank
-78 transcripts, tell you which turn a match belongs to, or hand back a session
-to resume - and it reads 90 MB per query where ccfind reads a 3.9 MB index.
+**The one miss is real.** `image-gc-high порог на ноде` has a single correct
+session; ccfind returns it at rank 2, with the exact `image-gc-high=75` snippet,
+behind a longer session that matched three common words but not the identifier.
+BM25's idf is logarithmic, so one rare identifier and two medium-rare words come
+out close, and a growing corpus tips it either way. Tuning constants until this
+one query passes would be fitting the benchmark, not fixing retrieval.
 
-The one miss is real and worth stating. `image-gc-high порог на ноде` has a
-single correct session; ccfind returns it at rank 2, with the exact
-`image-gc-high=75` snippet, behind a longer session that matched the three
-common Russian words but not the identifier. BM25's idf is logarithmic, so one
-rare identifier and two medium-rare words come out close, and the corpus tips
-it either way as it grows. Tuning constants until this one query passes would be
-fitting the benchmark, not fixing retrieval.
-
-P@3 is capped by how many sessions actually contain the identifier: one query has
-a single correct session, so its P@3 cannot exceed 0.33. The ceiling across the
-twelve queries is 0.94, against a measured 0.89. The gap is two queries that put
-an unrelated session at rank 3 - `InhibitDelayMaxSec долгая перезагрузка` pulls
+**P@3 is capped by the corpus**: one query has a single correct session, so its
+P@3 cannot exceed 0.33. The ceiling across the twelve is 0.94 against a measured
+0.89. The gap is two queries that put an unrelated session at rank 3 — one pulls
 in an Ansible session that matched only the common word "перезагрузка". The score
-already says so: 6.43 against 22.61 for the correct top hit. Rank 3 of a ranked
-list is where a lexical engine spends its uncertainty.
+already says so: 6.43 against 22.61 for the correct top hit. Rank 3 is where a
+lexical engine spends its uncertainty.
 
-`claude-historian-mcp` retrieves by recency, not by the query. Called without a
-limit it returns the same 93 lines every time - mean line-level overlap between
-different queries is **98.9%**, the only reliably differing line being the one
-echoing your query back, under a constant "Found 130 messages". Called with a
-limit of 8 it returns nothing at all for 6 of the 12 queries, and for the rest it
-returns recent assistant messages on unrelated topics: `coredns две реплики мало`
-comes back with a draft-PR discussion, an Ansible `sshd_config` refactor, and an
-EF Core `DbContext` review, each scored 2. Once results that are ccfind's own
-output quoted back are removed, 7 of 12 queries return nothing. The distinctive
-identifier appears in its output 0 times out of 12, and no result carries a
-session id - the only ids in its payloads are the `claude --resume` lines inside
-quoted ccfind answers - so there is nothing to resume from even when a hit is
-right. Both package names run the same code: the server reports itself as
-`claude-historian` 1.0.0 either way.
+**On the incumbent.** `claude-historian-mcp` retrieves by recency, not by the
+query. Called without a limit it returns the same 93 lines every time — mean
+line-level overlap between different queries is 98.9%, the only reliably
+differing line being the one echoing your query back, under a constant "Found 130
+messages". Called with a limit of 8 it returns nothing at all for 6 of the 12
+queries, and for the rest returns recent assistant messages on unrelated topics:
+one query about coredns replicas came back with a draft-PR discussion, an Ansible
+`sshd_config` refactor, and an EF Core `DbContext` review, each scored 2. After
+removing results that are ccfind's own output quoted back, 7 of 12 return
+nothing. The distinctive identifier appears in its output 0 times out of 12, and
+no result carries a session id — the only ids in its payloads are `claude
+--resume` lines inside quoted ccfind answers — so there is nothing to resume from
+even when a hit is right. Both package names run the same code: the server
+reports itself as `claude-historian` 1.0.0 either way.
 
-ccfind's 133 ms is a cold `node` process: interpreter start plus loading the
-3.9 MB index. The query itself takes 0-3 ms once the index is in memory.
-Indexing 90 MB from scratch takes about 2 seconds; an unchanged corpus is
-detected and skipped instantly, though during a live session the current
-transcript is always growing, so a search from inside Claude Code normally pays
+**Latency.** ccfind's 133 ms is a cold `node` process: interpreter start plus
+loading the 3.9 MB index. The query itself takes 0–3 ms once the index is in
+memory. Indexing 90 MB from scratch takes about 2 seconds; an unchanged corpus is
+detected and skipped instantly — though inside a live session your current
+transcript is always growing, so a search from within Claude Code normally pays
 the rebuild.
+
+</details>
 
 ## CLI
 
-The script works standalone, without Claude:
+The script runs standalone, without Claude:
 
 ```bash
-node skills/ccfind/scripts/ccfind.mjs index            # build or refresh
-node skills/ccfind/scripts/ccfind.mjs index --full     # force full rebuild
-node skills/ccfind/scripts/ccfind.mjs stats            # index size and counts
-node skills/ccfind/scripts/ccfind.mjs search "kube-vip" --limit 5
-node skills/ccfind/scripts/ccfind.mjs bench "q1" "q2"  # latency per query
+node skills/ccfind/scripts/ccfind.mjs index                       # build or refresh
+node skills/ccfind/scripts/ccfind.mjs index --full                # force full rebuild
+node skills/ccfind/scripts/ccfind.mjs stats                       # index size and counts
+node skills/ccfind/scripts/ccfind.mjs search "registry mirror" --limit 5
+node skills/ccfind/scripts/ccfind.mjs bench "q1" "q2"             # latency per query
 ```
 
-Search flags: `--limit N`, `--group session|exchange`, `--project SUBSTR`,
-`--session ID`, `--days N`,
-`--field title|prompt|answer|thinking|tool|output|summary`,
-`--exclude ID[,ID...]`, `--self`, `--json`.
+| Flag | Effect |
+| --- | --- |
+| `--limit N` | how many results |
+| `--group session\|exchange` | whole session, or the single turn |
+| `--project SUBSTR` | restrict by project or cwd |
+| `--session ID` | search inside one session |
+| `--days N` | only the last N days |
+| `--field title\|prompt\|answer\|thinking\|tool\|output\|summary` | search only that field |
+| `--exclude ID[,ID...]` | drop sessions from results |
+| `--self` | include the current session (excluded by default) |
+| `--json` | machine-readable output |
 
-The session doing the searching is excluded by default, since it is never the
-answer to its own question. `--self` puts it back.
+Worth knowing: `--field prompt` finds where **you** raised something,
+`--field output` finds what a command actually printed, and `--group exchange`
+pinpoints the turn instead of the session.
 
 ## Storage
 
@@ -174,19 +220,19 @@ answer to its own question. `--self` puts it back.
 ~/.claude/ccfind/state.json      per-transcript size and mtime
 ```
 
-Delete the directory to reset. Nothing else is written.
+Delete the directory to reset. Nothing else is written, anywhere.
 
 ## Limits
 
-- Any change to any transcript triggers a full rebuild. At ~2 s per 90 MB that
-  is fine; true incremental merge lands once the on-disk format settles.
+- Any change to any transcript triggers a full rebuild. At ~2 s per 90 MB that is
+  fine; true incremental merge lands once the on-disk format settles.
 - BM25 is lexical. A query sharing no words with the conversation will not match
-  it; there are no embeddings and no API calls.
+  it — there are no embeddings and no API calls.
 - Terms appearing in more than 40% of chunks are dropped from the index.
-- Snippets are verbatim transcript text, so whatever you pasted into a session -
-  a password, a token, an internal hostname - can come back in a result. Nothing
+- Snippets are verbatim transcript text, so whatever you pasted into a session — a
+  password, a token, an internal hostname — can come back in a result. Nothing
   leaves the machine, but the output is as sensitive as the history it searches.
 
 ## Licence
 
-MIT
+MIT. See [LICENSE](LICENSE).
