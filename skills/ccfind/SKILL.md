@@ -20,6 +20,10 @@ node <skill-dir>/scripts/ccfind.mjs index
 node <skill-dir>/scripts/ccfind.mjs search "<query>" --limit 8 --json
 ```
 
+If either command fails with `node: command not found`, stop and tell the user
+that ccfind needs Node 18+ on `PATH` and that Claude Code's native installer
+does not provide it. Do not fall back to reading transcripts by hand.
+
 `index` is idempotent and cheap: it prints `index up to date` and exits when
 nothing changed, and a full rebuild of a 90 MB corpus takes about 2 seconds.
 Inside a live session the current transcript is always growing, so that skip

@@ -15,6 +15,12 @@ matching snippet, and a ready `claude --resume <id>` command.
 Everything runs locally. No network calls, no API calls, no data leaves the
 machine.
 
+## Requirements
+
+Node 18 or newer on `PATH`. Nothing else - no npm install, no dependencies, no
+network. Claude Code's native installer does not ship a Node runtime, so check
+`node -v` first if the skill reports it cannot run.
+
 ## Install
 
 ```
