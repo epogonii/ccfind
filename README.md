@@ -239,12 +239,12 @@ Inside a Claude Code session, `/resume <id>` is the other half: that built-in
 slash command switches the window you type it in, rather than opening a second
 one.
 
-`pick` is the one that answers "let me choose it and open it": up and down or the
-mouse wheel move, a click selects a row, a second click on the highlighted row
-opens it, and Enter hands the terminal to
-`claude --resume` for the highlighted session; `q` quits. Mouse tracking is
-switched off again on exit, so the terminal's own text selection comes back. It needs a real terminal - piped or captured, it falls back to printing the
-list. Inside Claude Code the skill offers the same choice through the built-in
+`pick` is the one that answers "let me choose it and open it". Up and down or the
+mouse wheel move; a click selects a row and a second click on the highlighted row
+opens it; Enter hands the terminal to `claude --resume` for the highlighted
+session; `q` quits. Mouse tracking is switched off again on exit, so the
+terminal's own text selection comes back. It needs a real terminal - piped or
+captured, it falls back to printing the list. Inside Claude Code the skill offers the same choice through the built-in
 picker, but that can only pull the session's content into the current
 conversation: nothing can switch the active session from inside it.
 
