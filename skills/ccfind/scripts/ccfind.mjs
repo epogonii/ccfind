@@ -8,6 +8,7 @@ import path from 'node:path';
 import os from 'node:os';
 import readline from 'node:readline';
 import zlib from 'node:zlib';
+import { spawnSync } from 'node:child_process';
 
 const HOME = os.homedir();
 const PROJECTS = path.join(HOME, '.claude', 'projects');
@@ -694,6 +695,84 @@ if (cmd === 'index') {
       console.log(`\n${turns.length - shown.length} more turns - re-run with --turns ${turns.length}`);
     }
   }
+} else if (cmd === 'pick') {
+  // Arrow-key picker for a real terminal. Inside Claude Code a skill cannot take
+  // over the screen, so this is the only place where "select it and open it" can
+  // literally mean that: Enter hands the terminal to `claude --resume`.
+  const q = args._.slice(1).join(' ');
+  if (!q) { console.error('usage: ccfind.mjs pick <query> [--limit N]'); process.exit(1); }
+  let res;
+  try {
+    res = search(q, { limit: args.limit ? +args.limit : 15, group: 'session' });
+  } catch (e) { console.error(`ccfind: ${e.message}`); process.exit(1); }
+  if (!res.hits.length) { console.error(`nothing matched: ${res.terms.join(' ')}`); process.exit(1); }
+
+  const dry = !!process.env.CCFIND_PICK_DRYRUN;
+  const open = (h) => {
+    if (dry) { console.log(h.resume); process.exit(0); }
+    const r = spawnSync('claude', ['--resume', h.session], { stdio: 'inherit' });
+    if (r.error) {
+      console.error(`ccfind: could not run claude (${r.error.message})`);
+      console.error(h.resume);
+      process.exit(1);
+    }
+    process.exit(r.status ?? 0);
+  };
+
+  // No tty means no arrows: print the list and the commands rather than pretending.
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    human(res);
+    process.exit(0);
+  }
+
+  const ESC = '\u001b';
+  const rows = res.hits;
+  let cur = 0;
+  const w = () => Math.min(Math.max(process.stdout.columns || 80, 60), 120);
+  const trunc = (t, n) => (t && t.length > n ? t.slice(0, n - 1) + '…' : t || '');
+
+  const draw = () => {
+    const width = w();
+    let out = `${ESC}[2J${ESC}[H`;
+    out += `ccfind: ${res.total} session${res.total === 1 ? '' : 's'} match "${q}"` +
+           `${res.total > rows.length ? `, showing ${rows.length}` : ''}\n`;
+    out += `${ESC}[2m up/down to move, enter to resume, q to quit${ESC}[0m\n\n`;
+    rows.forEach((h, i) => {
+      const when = h.when ? h.when.slice(0, 10) : '          ';
+      const label = `${when}  ${trunc(h.title || h.project, width - 34)}`;
+      const score = String(h.score).padStart(7);
+      out += i === cur
+        ? `${ESC}[7m > ${label.padEnd(width - 12)}${score} ${ESC}[0m\n`
+        : `   ${label.padEnd(width - 12)}${ESC}[2m${score}${ESC}[0m\n`;
+    });
+    const h = rows[cur];
+    out += `\n${ESC}[2m${'-'.repeat(width - 2)}${ESC}[0m\n`;
+    out += `${shortPath(h.cwd) || h.project}${h.branch ? '  ' + h.branch : ''}` +
+           `${h.turns ? `  ${h.turns} turns` : ''}\n`;
+    if (h.opening) out += `${ESC}[2mbegan:${ESC}[0m ${trunc(h.opening, w() - 8)}\n`;
+    if (h.prompt && h.prompt !== '(session start)')
+      out += `${ESC}[2masked:${ESC}[0m ${trunc(h.prompt, w() - 8)}\n`;
+    out += `${ESC}[2m${h.field}:${ESC}[0m ${trunc(h.snippet.replace(/\s+/g, ' '), w() - 8)}\n`;
+    process.stdout.write(out);
+  };
+
+  process.stdin.setRawMode(true);
+  process.stdin.resume();
+  process.stdin.setEncoding('utf8');
+  draw();
+  process.stdin.on('data', (k) => {
+    if (k === '\u001b[A' || k === 'k') { cur = (cur - 1 + rows.length) % rows.length; draw(); }
+    else if (k === '\u001b[B' || k === 'j') { cur = (cur + 1) % rows.length; draw(); }
+    else if (k === '\r' || k === '\n') {
+      process.stdin.setRawMode(false);
+      process.stdout.write(`${ESC}[2J${ESC}[H`);
+      open(rows[cur]);
+    } else if (k === 'q' || k === '\u0003' || k === '\u001b') {
+      process.stdin.setRawMode(false);
+      process.stdout.write(`${ESC}[2J${ESC}[H`);
+      process.exit(0);
+    }
+  });
 } else if (cmd === 'bench') {
   const queries = args._.slice(1);
   if (!queries.length) { console.error('bench needs queries'); process.exit(1); }

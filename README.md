@@ -204,8 +204,17 @@ node skills/ccfind/scripts/ccfind.mjs index                       # build or ref
 node skills/ccfind/scripts/ccfind.mjs index --full                # force full rebuild
 node skills/ccfind/scripts/ccfind.mjs stats                       # index size and counts
 node skills/ccfind/scripts/ccfind.mjs search "registry mirror" --limit 5
+node skills/ccfind/scripts/ccfind.mjs show <session-id>            # one session's turns
+node skills/ccfind/scripts/ccfind.mjs pick "registry mirror"      # arrow-key picker
 node skills/ccfind/scripts/ccfind.mjs bench "q1" "q2"             # latency per query
 ```
+
+`pick` is the one that answers "let me choose it and open it": up and down move,
+Enter hands the terminal to `claude --resume` for the highlighted session, `q`
+quits. It needs a real terminal - piped or captured, it falls back to printing the
+list. Inside Claude Code the skill offers the same choice through the built-in
+picker, but that can only pull the session's content into the current
+conversation: nothing can switch the active session from inside it.
 
 | Flag | Effect |
 | --- | --- |
@@ -218,6 +227,7 @@ node skills/ccfind/scripts/ccfind.mjs bench "q1" "q2"             # latency per 
 | `--exclude ID[,ID...]` | drop sessions from results |
 | `--self` | include the current session (excluded by default) |
 | `--json` | machine-readable output |
+| `--turns N` | `show` only: how many turns to print (default 40) |
 
 Worth knowing: `--field prompt` finds where **you** raised something,
 `--field output` finds what a command actually printed, and `--group exchange`

@@ -21,6 +21,11 @@ node <skill-dir>/scripts/ccfind.mjs search "<query>" --limit 12 --json
 node <skill-dir>/scripts/ccfind.mjs show <session-id> --json      # one session's turns
 ```
 
+`pick "<query>"` also exists: an arrow-key list that runs `claude --resume` on
+Enter. It needs a real terminal, so **never run it yourself** - a tool call has no
+tty and it would just print the list. Suggest it to the user instead.
+
+
 If either command fails with `node: command not found`, stop and tell the user
 that ccfind needs Node 18+ on `PATH` and that Claude Code's native installer
 does not provide it. Do not fall back to reading transcripts by hand.
@@ -98,36 +103,51 @@ the turn rather than the conversation.
 
 ## Answering
 
-Lead with the session that answers the question, quote the snippet that proves
-it, and give the `resume` command. Detail the best two or three hits.
+Terse. The question is *which session*, not an essay about searching.
 
-**Never leave the rest invisible.** After the detailed ones, list every remaining
-hit on one line each - `title, date, one clause of what it was` - and if `total`
-is larger than the hits you got, say so in as many words: *"ещё N сессий не
-показаны"*. A user who sees "8 sessions matched" and gets 3 has no way to know
-what is behind the other 5. When they ask for all of them, re-run with
-`--limit <total>` rather than guessing.
+Default shape - the two or three that answer it, one line each, then the rest as
+one line each, then a count:
 
-If `coverage` is well below 1 on every hit, say the match is weak instead of
-presenting a guess as an answer.
+```
+1. Fix NuGet dependency resolution   08-04  acme-api   12.2  e5f6a7b8
+   "падает restore пакетов в CI" -> buildUrl .../job/acme-api/470/
+2. ...
++ 20 more, weaker: registry mirror 08-10, ansible 07-31, mcp 08-05, ...
+```
+
+Rules:
+
+- no preamble. Not "I ran a search and found" - just the hits.
+- one quoted fragment per hit, the shortest that proves it, verbatim from
+  `snippet`. Never paraphrase a snippet into something the transcript did not say.
+- the first 8 characters of the session id are enough to resume with; print the
+  whole `claude --resume` line only for the one you are recommending.
+- state what is not shown in a clause, not a paragraph: `+ 20 more`. Never let
+  `total` be larger than what you listed without saying so.
+- a full table only when the user asks to see all of them.
+- match the user's language, and whatever output style the session is running. A
+  terse style stays terse here too.
+- if `coverage` is well below 1 on every hit, one line saying the match is weak
+  beats a confident guess.
 
 ## Letting the user pick
 
-When two to four hits are all plausible and the user's next move is obviously
-"open that one", offer the choice with `AskUserQuestion` instead of a wall of
-text: one option per session, the label being its title, the description being
-date, project, and its `opening` turn. Add a *"show all N"* option whenever
-`total` exceeds what is on offer, since the picker takes at most four.
+When the user's next move is obviously "open that one", end with an
+`AskUserQuestion` picker instead of asking them to copy an id: the top three
+sessions plus a *"show all N"* option. Label = session title, description = date,
+project, and the `opening` turn. The picker takes four options at most, which is
+why the fourth one is the escape hatch to the full list.
 
-Whatever they pick, run `show <id> --json` and answer from that: what the session
-covered, in order, and where the thing they asked about sits in it. Also give the
-`resume` command.
+Whatever they pick, run `show <id> --json` and answer from it. Keep that answer
+terse too: what the session was about, and where the thing they asked about sits
+in it.
 
 Be straight about the limit: **you cannot switch the active session for them.**
-`claude --resume` starts a separate run; there is no way for a skill to move this
-conversation into another one. What picking does is pull that session's content
-into the current conversation, which keeps the work in progress here. Offer the
-`resume` line for when they want the real jump.
+`claude --resume` starts a separate run, and no skill can move this conversation
+into another one. Picking pulls that session's content in here, which keeps the
+work in progress. For the real jump, there is `claude --resume <id>` - or
+`ccfind.mjs pick "<query>"` in a terminal, which is an arrow-key list that hands
+the terminal straight to `claude --resume` on Enter.
 
 ## Notes
 
