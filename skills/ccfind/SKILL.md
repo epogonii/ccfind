@@ -113,6 +113,13 @@ the turn rather than the conversation.
   a 2-turn one is a question.
 - `open` is `/resume <id>` - typed in this window it switches to that session in
   place. `resume` is `claude --resume <id>`, which starts a separate run instead.
+- `client` (top level, when the search can tell who is asking): `model`, plus a
+  `layout` of `table` or `in-question` and a `note` saying what to do. **Follow
+  it** - it is measured from the session's own transcript, not guessed. `table`
+  is the normal answer described below. `in-question` means this model does not
+  write message text in a turn that also calls a tool, so a table above the
+  picker would never reach the user; put the hits in the picker's `question`
+  instead, as described under "Letting the user pick".
 - `relevant`, `weak` and `total` (top level). BM25 scores every session holding
   a single query word, so `total` is wide and mostly noise. The relevance gate
   keeps the hits scoring within 25% of the top one - `relevant` - and hides the
@@ -234,6 +241,13 @@ Do not compensate by cramming the hits into the `question` string either. It
 renders, but it is one plain paragraph - no columns, no alignment - and it
 duplicates what the table above already says better. Question = one line: the
 ask.
+
+**Unless `client.layout` is `in-question`.** Then the table cannot reach the user
+at all and the picker is the only channel left, so the question carries the hits:
+one line each, `N. title - date, project, N turns: "snippet"`, the ask on the
+last line. Still four options per page, still the same paging. After the pick,
+answer in message text as usual - that turn has no tool call in it, so the text
+survives - and give the full `/resume` line there.
 
 `AskUserQuestion` takes **four options, hard cap** (harness limit, not ours), so
 page through the hits three at a time:

@@ -473,6 +473,36 @@ r = run(['index']);
 ok('a grown transcript is reindexed', /indexed 5 sessions/.test(r.err), r.err);
 eq('the new turn is searchable', list(json(['search', 'flimberwock'])), MID);
 
+// ------------------------------------------------------- the calling model
+
+// The layout the skill uses depends on which model is asking, and that is read
+// out of the caller's own transcript - the assistant message holding the tool
+// call is on disk before the tool runs.
+function asSession(id, model) {
+  const dir = path.join(CONFIG, 'projects', '-home-dev-api');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, `${id}.jsonl`), JSON.stringify({
+    sessionId: id, type: 'assistant', uuid: 'a0', parentUuid: null, cwd: '/home/dev/api',
+    timestamp: iso(0), message: { role: 'assistant', model, content: [{ type: 'tool_use', id: 'toolu_9', name: 'Bash', input: { command: 'ccfind search' } }] },
+  }) + '\n');
+  return { CLAUDE_CODE_SESSION_ID: id };
+}
+
+let c = json(['search', 'flimberwock'], asSession('11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'claude-opus-5')).j;
+eq('the caller model is reported', c.client.model, 'claude-opus-5');
+eq('a model that writes text gets the table layout', c.client.layout, 'table');
+c = json(['search', 'flimberwock'], asSession('22222222-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'claude-fable-5')).j;
+eq('a model that skips text before a tool call gets the other layout', c.client.layout, 'in-question');
+ok('and is told where the hits go', /question string/.test(c.client.note), c.client.note);
+c = json(['search', 'flimberwock'], asSession('33333333-cccc-4ccc-8ccc-cccccccccccc', 'claude-sonnet-5')).j;
+eq('sonnet is not swept up by the fable pattern', c.client.layout, 'table');
+c = json(['search', 'flimberwock']).j;
+ok('no session id means no advice at all', c.client === undefined, JSON.stringify(c.client));
+c = json(['search', 'flimberwock'], { CLAUDE_CODE_SESSION_ID: 'no-such-session-id' }).j;
+ok('an unknown session id is not an error', c.client === undefined && c.hits.length > 0, JSON.stringify(c.client));
+c = json(['search', 'flimberwock'], { CLAUDE_CODE_SESSION_ID: '../../../etc/passwd' }).j;
+ok('a path in the session id is refused', c.client === undefined, JSON.stringify(c.client));
+
 // ------------------------------------------------------------------ report
 
 fs.rmSync(ROOT, { recursive: true, force: true });

@@ -3,6 +3,29 @@
 Versions up to 0.16.3 are dated 2026-08-25: the project went from first commit
 to the plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.18.0
+
+- The search now knows which model is asking, and says how to lay the answer
+  out. `search --json` grows a `client` block - `model`, a `layout` of `table`
+  or `in-question`, and a note - read from the calling session's own transcript:
+  `CLAUDE_CODE_SESSION_ID` names the file, and the assistant message carrying
+  the tool call is already on disk when the tool runs, so this works on the first
+  search of a fresh session, which is where the answer was being lost.
+
+  Why it exists: some models emit no message text at all in a turn that also
+  calls a tool. The table is message text, the picker is the tool call, so those
+  models print a picker with nothing above it - three titles where twelve rows
+  should be. Six releases of prompt wording did not move that, including a rule
+  in 0.17.3 telling them to drop the picker instead. What they do honour is the
+  content of the tool call itself, so for them the hits now ride inside the
+  picker's `question` string, and everyone else keeps the table.
+
+  This is a real fork in the output, so it is measured rather than assumed: no
+  session id, an unknown one, or a model that writes text all take the table
+  path, and the pattern list is one regex with a comment recording the evidence
+  behind it. Eight tests cover the fork, including a session id with a path in
+  it.
+
 ## 0.17.3
 
 - 0.17.2's headless check had a hole: `claude -p` does not offer

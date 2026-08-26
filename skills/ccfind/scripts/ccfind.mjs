@@ -681,6 +681,70 @@ function shortPath(p) {
   return p === HOME ? '~' : p.startsWith(HOME + path.sep) ? '~' + p.slice(HOME.length) : p;
 }
 
+// Which model is driving the session that called us, read out of the transcript
+// Claude Code is writing as it goes. The assistant message carrying the tool
+// call that started this process is already on disk by the time the process
+// runs, so this answers on the very first search of a fresh session - which is
+// the case that matters, since that is where the answer goes missing.
+function currentModel() {
+  const id = process.env.CLAUDE_CODE_SESSION_ID || process.env.CLAUDE_SESSION_ID;
+  if (!id || !/^[A-Za-z0-9._-]+$/.test(id)) return null;
+  let file = null;
+  try {
+    for (const proj of fs.readdirSync(PROJECTS)) {
+      const p = path.join(PROJECTS, proj, `${id}.jsonl`);
+      if (fs.existsSync(p)) { file = p; break; }
+    }
+  } catch { return null; }
+  if (!file) return null;
+  // Transcripts reach hundreds of megabytes; the model is in the last handful of
+  // lines, so read the tail and scan it backwards.
+  try {
+    const size = fs.statSync(file).size;
+    const start = Math.max(0, size - 262144);
+    const fd = fs.openSync(file, 'r');
+    const buf = Buffer.alloc(size - start);
+    fs.readSync(fd, buf, 0, buf.length, start);
+    fs.closeSync(fd);
+    const lines = buf.toString('utf8').split('\n');
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (!lines[i] || !lines[i].includes('"model"')) continue;
+      let d;
+      try { d = JSON.parse(lines[i]); } catch { continue; }
+      if (d && d.message && typeof d.message.model === 'string') return d.message.model;
+    }
+  } catch { return null; }
+  return null;
+}
+
+// Some models emit no message text at all in a turn that also calls a tool.
+// This skill's whole answer is text - a table - so on those the user gets a bare
+// picker and no results. Wording does not move them: 0.16.4 through 0.17.3 each
+// tried a different phrasing, up to "print the table and skip the picker", and
+// the transcripts show zero text blocks every time. What they do honour is the
+// content of the tool call itself, so there the hits have to ride inside the
+// picker's own question string. Matched loosely, because the id carries a
+// version suffix that changes without notice.
+const TEXT_WITH_TOOL_CALL_UNRELIABLE = [/(^|[-_])fable/i];
+
+function clientAdvice() {
+  const model = currentModel();
+  if (!model) return null;
+  const inQuestion = TEXT_WITH_TOOL_CALL_UNRELIABLE.some((re) => re.test(model));
+  return {
+    model,
+    layout: inQuestion ? 'in-question' : 'table',
+    note: inQuestion
+      ? 'This model does not write message text in a turn that also calls a tool, '
+        + 'so a table above the picker would be lost. Put the hits inside the '
+        + 'AskUserQuestion question string instead - one line per hit, "N. title - '
+        + 'date, project, turns: snippet" - and keep the recommendation and the '
+        + 'full /resume line in the message you send after the pick.'
+      : 'Print the table as message text first, then call AskUserQuestion with a '
+        + 'one-line question.',
+  };
+}
+
 function human(res) {
   if (!res.hits.length) {
     console.log(`nothing matched: ${res.terms.join(' ')}`);
@@ -1265,6 +1329,8 @@ import(pathToFileURL(target).href).catch((err) => {
     console.error(`ccfind: ${e.message}`);
     process.exit(1);
   }
-  if (args.json) console.log(JSON.stringify(res, null, 2));
-  else human(res);
+  if (args.json) {
+    const client = clientAdvice();
+    console.log(JSON.stringify(client ? { ...res, client } : res, null, 2));
+  } else human(res);
 }
