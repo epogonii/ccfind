@@ -729,6 +729,20 @@ const TEXT_WITH_TOOL_CALL_UNRELIABLE = [/(^|[-_])fable/i];
 
 function clientAdvice() {
   const model = currentModel();
+  // Nothing to read yet: this is the first tool call of a fresh session, which
+  // happens when `index` and `search` were chained into one. Say so rather than
+  // guessing a layout - the caller can fix it by splitting them, and the second
+  // call answers.
+  if (!model && (process.env.CLAUDE_CODE_SESSION_ID || process.env.CLAUDE_SESSION_ID)) {
+    return {
+      model: null,
+      layout: 'unknown',
+      note: 'Could not tell which model is asking - this is the first tool call of '
+        + 'the session, so the transcript has nothing in it yet. Run `search` as '
+        + 'its own tool call, not chained onto `index` with &&, and this will '
+        + 'answer.',
+    };
+  }
   if (!model) return null;
   const inQuestion = TEXT_WITH_TOOL_CALL_UNRELIABLE.some((re) => re.test(model));
   return {

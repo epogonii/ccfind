@@ -3,6 +3,21 @@
 Versions up to 0.16.3 are dated 2026-08-25: the project went from first commit
 to the plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.18.1
+
+- 0.18.0's `client` block never arrived in the case it was written for. A model
+  is free to chain `index && search` into a single tool call, and on the first
+  turn of a fresh session that leaves the transcript with no assistant entry to
+  read - so the search could not tell who was asking, stayed silent, and the
+  layout fell back to the table that model would not print. Run as two separate
+  calls, the second one sees the first, which is why the same query worked
+  everywhere it was tested and failed in a real session.
+
+  Two fixes. SKILL.md now says the two commands are two tool calls and must not
+  be chained, with the reason. And when the transcript really is empty, `client`
+  no longer disappears: it comes back as `layout: "unknown"` with a note saying
+  to re-run `search` on its own, so the next call recovers instead of guessing.
+
 ## 0.18.0
 
 - The search now knows which model is asking, and says how to lay the answer

@@ -499,9 +499,11 @@ eq('sonnet is not swept up by the fable pattern', c.client.layout, 'table');
 c = json(['search', 'flimberwock']).j;
 ok('no session id means no advice at all', c.client === undefined, JSON.stringify(c.client));
 c = json(['search', 'flimberwock'], { CLAUDE_CODE_SESSION_ID: 'no-such-session-id' }).j;
-ok('an unknown session id is not an error', c.client === undefined && c.hits.length > 0, JSON.stringify(c.client));
+eq('a transcript with nothing in it yet says so', c.client.layout, 'unknown');
+ok('and the hits still come back', c.hits.length > 0, c.hits.length);
+ok('and it says how to get an answer', /own tool call/.test(c.client.note), c.client.note);
 c = json(['search', 'flimberwock'], { CLAUDE_CODE_SESSION_ID: '../../../etc/passwd' }).j;
-ok('a path in the session id is refused', c.client === undefined, JSON.stringify(c.client));
+eq('a path in the session id is refused', c.client.layout, 'unknown');
 
 // ------------------------------------------------------------------ report
 

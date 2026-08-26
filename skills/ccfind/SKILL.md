@@ -16,7 +16,12 @@ thing was discussed. This does.
 
 ## How to run it
 
-Everything happens in one Node process. Two commands, in this order.
+Everything happens in one Node process. Two commands, in this order, as **two
+separate tool calls** - never chained with `&&` into one. `search` reports which
+model is asking by reading the session transcript, and on the first turn of a
+fresh session that file only has the earlier call's entries in it: chaining the
+two hides the very thing that decides the layout (see `client` under "Reading a
+hit"), and the answer comes out in the wrong shape.
 
 ```bash
 node <skill-dir>/scripts/ccfind.mjs index
