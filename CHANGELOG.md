@@ -3,6 +3,19 @@
 Versions up to 0.16.3 are dated 2026-08-25: the project went from first commit
 to the plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.17.1
+
+- The table is back in front of the picker, where 0.16.5 had it. 0.17.0 moved
+  the hit list into the `question` string on the theory that Claude Code
+  collapses pre-tool-call text into "(summarized)" - that theory was wrong.
+  "(summarized)" is the away-recap, the thing the UI shows when you come back
+  to a session after a few minutes away, not a rule about mid-turn text; and
+  in the sessions where the table went missing the model had written no text at
+  all, so there was nothing to collapse. The question string does render
+  multiline, but a paragraph of run-together hits reads worse than the table it
+  was standing in for. SKILL.md now says why the pre-picker text is legitimate
+  (an answer is not a progress note) and that the question stays one line.
+
 ## 0.17.0
 
 - The hits moved into the picker itself. Claude Code 2.1.246 collapses any

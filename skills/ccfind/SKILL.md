@@ -124,11 +124,8 @@ the turn rather than the conversation.
 
 Terse, and legible in a terminal. The question is *which session*.
 
-Placement: current Claude Code renders only the *final* message of a turn in
-full - text written before a tool call collapses to a "(summarized)" stub. So
-the table below belongs in the final message (after the picker resolves), and
-the picker's own question text carries the hit list the user picks from - see
-"Letting the user pick".
+Placement: the table comes **first**, as ordinary message text, before the
+picker is called - the user needs it to pick. See "Letting the user pick".
 
 A markdown table, one row per hit. The headers are what makes it readable - a
 bare column of numbers leaves the user guessing what `169` meant.
@@ -200,40 +197,38 @@ The block is text - the user cannot select in it. So **always** end a session
 search with an `AskUserQuestion` picker; that is the only arrow-key selection
 the chat has. Not "when it seems useful" - always.
 
-**The picker itself carries the hits.** Current Claude Code collapses any
-message text written before a tool call into a one-line "(summarized)" stub,
-so a table printed before the picker may never be seen - the `question` string
-is the only surface guaranteed to render in full (it does, verified multiline).
-Build it as:
+The picker **comes after the table, never instead of it**. Write the table, the
+counts line and the recommendation as ordinary message text, *then* call
+`AskUserQuestion` in the same turn. Writing text before a tool call is a
+deliberate act here, not narration: this table is the answer, the picker is only
+the selection widget on top of it. Nothing in a general instruction about
+skipping preamble before tool calls covers it - the ban is on progress notes,
+and an answer is not a progress note. A turn whose only visible output is the
+`AskUserQuestion` call is wrong every time, no matter how good the reasoning
+was: three bare titles, no dates side by side, no snippets, no counts, and no
+answer to what the user asked. Reasoning is not output.
 
-- first line: the ask - "Which session to open?" in the user's language;
-- blank line, then one numbered line per hit on this page:
-  `1. <title> - <date>, <project>, <turns> requests, "<snippet fragment>"`;
-- blank line, then the counts line: `4 relevant of 15 matched; 11 weak`.
-
-Keep each hit line to one line - trim the fragment, not the fields. The full
-table with every column still exists; it goes in the final message *after* the
-pick (below), which is the one message the UI never collapses.
+Do not compensate by cramming the hits into the `question` string either. It
+renders, but it is one plain paragraph - no columns, no alignment - and it
+duplicates what the table above already says better. Question = one line: the
+ask.
 
 `AskUserQuestion` takes **four options, hard cap** (harness limit, not ours), so
 page through the hits three at a time:
 
-- options 1-3: the same three hits as in the question text. Label = session
-  title, description = date, project, and the `opening` turn.
+- options 1-3: the next three hits. Label = session title, description = date,
+  project, and the `opening` turn.
 - option 4: `next 3 (4-6 of 13)`, in the language of the answer - naming the
   range, so the user can see the arrows reach the whole list. Re-ask with the
-  next three when they take it (question text updated to those hits). Only on
-  the last page does option 4 become a plain *show all N* dump.
+  next three when they take it. Only on the last page does option 4 become a
+  plain *show all N* dump.
 
-If the user cancels the picker, the turn's final message is the full table,
-the counts line and the recommendation - a cancelled pick must never leave
-them with nothing.
+If the user cancels the picker, the table is already on screen - that is the
+point of printing it first. Close with the recommendation if the turn has no
+other final message.
 
 Whatever they pick, run `show <id> --json` and **answer their original question
-from it** - not a summary of the session for its own sake. That final message
-opens with the full table of hits (the format from Answering above): it is the
-first surface where the user actually sees the whole field, so it comes before
-the per-session answer. Terse: what that
+from it** - not a summary of the session for its own sake. Terse: what that
 session concluded about the thing they asked, and where in it that sits. Then
 they can keep asking about it here, which is the point: the session's content is
 now in this conversation.
