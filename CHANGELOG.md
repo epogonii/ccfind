@@ -3,6 +3,17 @@
 Versions up to 0.16.3 are dated 2026-08-25: the project went from first commit
 to the plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.16.5
+
+- The table-before-picker rule now argues with the reason it was being broken.
+  With 0.16.4's wording loaded, a high-effort model still answered a search
+  with the bare picker: its harness tells it mid-turn text may not be shown and
+  everything belongs in the final message, so it deferred the table to after
+  the pick - where a cancelled picker means the user gets nothing at all.
+  SKILL.md now states that text before a tool call is rendered above the
+  picker, that the user needs the table *to* pick, and that a turn whose only
+  visible output is the `AskUserQuestion` call is wrong every time.
+
 ## 0.16.4
 
 - The answer's table cannot be skipped in favour of the picker. On one machine
