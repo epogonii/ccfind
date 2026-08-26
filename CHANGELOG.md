@@ -3,6 +3,21 @@
 Versions up to 0.16.3 are dated 2026-08-25: the project went from first commit
 to the plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.17.0
+
+- The hits moved into the picker itself. Claude Code 2.1.246 collapses any
+  message text written before a tool call into a one-line "(summarized)" stub,
+  so the table-before-picker layout - however firmly the skill demanded it -
+  can never be seen there: the model's text, when it wrote one at all, was
+  swallowed by the UI (older versions, e.g. on Linux, still render it, which
+  is why the same skill looked fine on one machine and broken on another).
+  The `AskUserQuestion` question string is the one surface guaranteed to
+  render in full, and it renders multiline (verified), so it now carries a
+  numbered hit list - title, date, project, request count, snippet fragment -
+  plus the counts line. The full table moved to the turn's final message after
+  the pick, the only message the UI never collapses, and a cancelled picker
+  gets the table as the final message too.
+
 ## 0.16.5
 
 - The table-before-picker rule now argues with the reason it was being broken.
