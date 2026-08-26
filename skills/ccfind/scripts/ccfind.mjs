@@ -912,6 +912,10 @@ import(pathToFileURL(target).href).catch((err) => {
   if (!idx) { console.error('no index - run: ccfind.mjs index'); process.exit(1); }
   const ses = idx.sessions.find((x) => x.id.startsWith(want));
   if (!ses) { console.error(`ccfind: no session starting with ${want}`); process.exit(1); }
+  // The id lands unquoted in a shell command below. It is a transcript's file
+  // name, so a stray file with metacharacters in its name must stop here rather
+  // than run inside the new window.
+  if (!/^[A-Za-z0-9._-]+$/.test(ses.id)) { console.error(`ccfind: refusing to launch: session id ${JSON.stringify(ses.id)} is not a plain file name`); process.exit(1); }
   const cwd = ses.cwd && fs.existsSync(ses.cwd) ? ses.cwd : HOME;
   const inner = `cd ${JSON.stringify(cwd)} && claude --resume ${ses.id}`;
   // The same command wrapped so a Linux emulator still confirms closing the
@@ -1036,7 +1040,7 @@ import(pathToFileURL(target).href).catch((err) => {
 
   // A key script in CCFIND_PICK_KEYS is fed to the same handler a terminal feeds,
   // which is how the filter gets tested without a pseudo-terminal: `\e` is Escape,
-  // `\r` is Enter, `\b` is Backspace, `\xNN` is that byte, and every other
+  // `\r` is Enter, `\b` is Backspace (DEL, 0x7f - what a modern keyboard sends), `\xNN` is that byte, and every other
   // character is itself.
   const keyScript = process.env.CCFIND_PICK_KEYS
     ? process.env.CCFIND_PICK_KEYS

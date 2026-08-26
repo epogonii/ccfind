@@ -194,6 +194,13 @@ The block is text - the user cannot select in it. So **always** end a session
 search with an `AskUserQuestion` picker; that is the only arrow-key selection
 the chat has. Not "when it seems useful" - always.
 
+The picker **comes after the table, never instead of it**. Print the table,
+the counts line and the recommendation as ordinary message text first, and only
+then call `AskUserQuestion`. Reasoning is not output: a turn that goes straight
+from the search result to the picker shows the user a list of three titles and
+nothing else - no dates seen side by side, no snippets, no counts - and the
+answer to their question is gone.
+
 `AskUserQuestion` takes **four options, hard cap** (harness limit, not ours), so
 page through the hits three at a time:
 

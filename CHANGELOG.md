@@ -1,7 +1,22 @@
 # Changelog
 
-All versions are dated 2026-08-25: the project went from first commit to the
-plugin directory in one sitting, and this log keeps the real steps.
+Versions up to 0.16.3 are dated 2026-08-25: the project went from first commit
+to the plugin directory in one sitting, and this log keeps the real steps.
+
+## 0.16.4
+
+- The answer's table cannot be skipped in favour of the picker. On one machine
+  the model went straight from the search result to `AskUserQuestion`, so the
+  user saw a picker with three titles and nothing else - no table, no counts,
+  no recommendation, and no answer to what they asked. SKILL.md now spells out
+  the order: the table, the counts line and the recommendation as message text
+  first, the picker call after, and that reasoning text does not count as
+  output.
+- `open` refuses a session id that is not a plain file name. The id is a
+  transcript's file name and is interpolated unquoted into the `sh -lc` command
+  the new terminal window runs, so a stray file with shell metacharacters in
+  its name would have executed them. Ids are now validated against
+  `[A-Za-z0-9._-]` before anything is launched.
 
 ## 0.16.3
 
