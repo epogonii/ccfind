@@ -3,14 +3,29 @@
 Versions up to 0.16.3 are dated 2026-08-25: the project went from first commit
 to the plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.17.3
+
+- 0.17.2's headless check had a hole: `claude -p` does not offer
+  `AskUserQuestion`, so in that harness the table was the only thing the model
+  could produce, and the exact condition that loses it - a picker call sitting
+  where message text should be - never arose. In a real session a weak model
+  still goes straight to the picker and writes nothing.
+
+  So the picker stops being mandatory. The skill now says the picker is the
+  optional half of the turn and the table is not: if anything makes a model
+  unwilling to send text before a tool call, it should drop the picker and print
+  the table as the final message. Every row carries an id and the recommendation
+  carries the whole `/resume` line, so a table with no picker still works,
+  whereas a picker with no table answers nothing.
+
 ## 0.17.2
 
-- The missing table, actually found this time. Four releases had guessed at it
-  from the transcripts; a headless run settles it. `claude -p "<a search>"` with
-  `--model` and a `--settings` file that switches a plugin off isolates one
-  variable at a time, and in that harness the picker is unavailable, so the table
-  would be the whole final message - which rules out any theory about text before
-  a tool call.
+- Two prompt fixes aimed at the missing table. They hold on their own terms - a
+  model that writes the table writes a better one - but read 0.17.3 before
+  trusting the verification claimed here. `claude -p "<a search>"` with `--model`
+  and a `--settings` file that switches a plugin off isolates one variable at a
+  time, which is genuinely useful; what it cannot do is show the failure, since
+  the picker does not exist in that mode.
 
   Two conditions have to hold together. Weaker models drop the table unless
   SKILL.md states outright that it is the answer rather than an optional
@@ -22,9 +37,10 @@ to the plugin directory in one sitting, and this log keeps the real steps.
   preamble" now says "open with the table itself": the old phrasing read, to a
   model already inclined to say less, as permission to print nothing.
 
-  Verified on the same query across four runs: weak model without the style
-  plugin, with it, and a strong model with it - table in all three after the
-  change, absent in the control before it.
+  Measured on the same query across four headless runs: weak model without the
+  style plugin, with it, and a strong model with it - table in all three after
+  the change, absent in the control before it. That is a real result about
+  wording, and not the fix it was announced as.
 
 ## 0.17.1
 

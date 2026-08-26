@@ -207,9 +207,17 @@ Rules:
 
 ## Letting the user pick
 
-The block is text - the user cannot select in it. So **always** end a session
-search with an `AskUserQuestion` picker; that is the only arrow-key selection
-the chat has. Not "when it seems useful" - always.
+The block is text - the user cannot select in it. So end a session search with an
+`AskUserQuestion` picker; that is the only arrow-key selection the chat has.
+
+**The picker is the optional half of the turn. The table is not.** If anything in
+force - a house style, a rule about not writing before tool calls, your own
+instinct to be brief - makes you unwilling to send message text ahead of the
+picker call, resolve it the other way: print the table, the counts and the
+recommendation as the final message and skip the picker entirely. The user can
+still act, because every row carries an id and the recommendation carries the
+whole `/resume` line. A picker with nothing above it is the one outcome that is
+always wrong, and it is worse than no picker at all.
 
 The picker **comes after the table, never instead of it**. Write the table, the
 counts line and the recommendation as ordinary message text, *then* call
