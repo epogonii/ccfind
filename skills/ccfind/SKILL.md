@@ -124,8 +124,20 @@ the turn rather than the conversation.
 
 Terse, and legible in a terminal. The question is *which session*.
 
-Placement: the table comes **first**, as ordinary message text, before the
-picker is called - the user needs it to pick. See "Letting the user pick".
+**The answer is the table.** Every reply to a search prints it, in full, as
+ordinary message text. A reply that gives only the recommendation, or only the
+`AskUserQuestion` picker, has not answered - the user asked which sessions
+matched and cannot see them. Terseness applies to the words around the table,
+never to the table itself.
+
+This table is data, not decoration. A house style that bans decorative tables,
+or demands maximum compression, does not reach it: the columns *are* the answer,
+and the same twelve hits written as prose are longer to read and impossible to
+scan. Compress the sentences around it instead - and in that style, write them in
+that style. The table stays.
+
+Placement: it comes **first**, before the picker is called - the user needs it
+to pick. See "Letting the user pick".
 
 A markdown table, one row per hit. The headers are what makes it readable - a
 bare column of numbers leaves the user guessing what `169` meant.
@@ -147,7 +159,9 @@ nobody and leaves the user guessing what the numbers are. The word for
 
 Rules:
 
-- no preamble. Not "I ran a search and found" - the table first.
+- open with the table itself. No lead-in sentence in front of it - not "I ran a
+  search and found" - but the table is the thing that must be there: dropping it
+  is not terseness, it is a missing answer.
 - **every hit the search returned**, not the best three. `--limit 12` asks for
   twelve because the user wants the whole field; answering a twelve-hit search
   with three rows hides nine sessions. Trim cells, never drop rows.

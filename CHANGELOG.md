@@ -3,6 +3,29 @@
 Versions up to 0.16.3 are dated 2026-08-25: the project went from first commit
 to the plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.17.2
+
+- The missing table, actually found this time. Four releases had guessed at it
+  from the transcripts; a headless run settles it. `claude -p "<a search>"` with
+  `--model` and a `--settings` file that switches a plugin off isolates one
+  variable at a time, and in that harness the picker is unavailable, so the table
+  would be the whole final message - which rules out any theory about text before
+  a tool call.
+
+  Two conditions have to hold together. Weaker models drop the table unless
+  SKILL.md states outright that it is the answer rather than an optional
+  flourish, and a terse-output style plugin that bans "decorative tables" takes
+  this one with it, because from inside that rule a table is a table. So the
+  Answering section now opens by saying the reply *is* the table, and says the
+  table is data, not decoration - a house style demanding compression governs the
+  sentences around it, not the columns. The bullet that used to open "no
+  preamble" now says "open with the table itself": the old phrasing read, to a
+  model already inclined to say less, as permission to print nothing.
+
+  Verified on the same query across four runs: weak model without the style
+  plugin, with it, and a strong model with it - table in all three after the
+  change, absent in the control before it.
+
 ## 0.17.1
 
 - The table is back in front of the picker, where 0.16.5 had it. 0.17.0 moved
