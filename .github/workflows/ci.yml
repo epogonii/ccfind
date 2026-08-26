@@ -1,7 +1,11 @@
 name: ci
 
+# Every push used to start a run, and tagging a release started a second one for
+# the same commit - six jobs twice over for a one-line fix. Releases are what
+# need proving, so tags trigger it; anything else runs on request.
 on:
   push:
+    tags: ['ccfind--v*']
   pull_request:
   workflow_dispatch:
 
