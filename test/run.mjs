@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -514,6 +514,91 @@ fs.appendFileSync(path.join(CONFIG, 'projects', '-home-dev-api', `${MID}.jsonl`)
 r = run(['index']);
 ok('a grown transcript is reindexed', /indexed 5 sessions/.test(r.err), r.err);
 eq('the new turn is searchable', list(json(['search', 'flimberwock'])), MID);
+
+// -------------------------------------------------------------- the store
+
+const STORE = path.join(CONFIG, 'ccfind');
+const INDEX = path.join(STORE, 'index.json.gz');
+const DOCS = path.join(STORE, 'docs.jsonl');
+const LOCKF = path.join(STORE, 'index.lock');
+const leftovers = () => fs.readdirSync(STORE).filter((f) => f.endsWith('.tmp') || f === 'index.lock');
+
+eq('a rebuild leaves no staging files behind', leftovers().join(','), '');
+
+// The working directory lands in a shell command. JSON quoting looks like shell
+// quoting and is not: "$HOME" expands, and a backtick runs.
+const QUOTED = '66666666-6666-4666-8666-666666666666';
+const ODD = path.join(ROOT, 'it\'s $HOME "here"');
+fs.mkdirSync(ODD, { recursive: true });
+write('-odd', QUOTED, session({
+  project: '-odd', id: QUOTED, title: 'odd directory', cwd: ODD, at: 1000,
+  turns: [['quibblesnap in an odd place', 'still fine']],
+}));
+r = run(['index']);
+ok('a new transcript is picked up', /indexed 6 sessions/.test(r.err), r.err);
+r = run(['open', QUOTED], { CCFIND_OPEN_DRYRUN: '1' });
+// The macOS ladder wraps the command in an AppleScript string, which escapes
+// the quotes again, so only Linux is held to the exact spelling; every platform
+// is held to the opening single quote and to the absence of the old JSON form.
+const shq = (s) => `'${s.replace(/'/g, "'\\''")}'`;
+const want = JSON.stringify(`cd ${shq(ODD)} && claude --resume ${QUOTED}`).slice(1, -1);
+if (LINUX) ok('the working directory is single-quoted for the shell', r.out.includes(want), `want ${want}\n${r.out}`);
+ok('the quoting opens with a single quote', r.out.includes(`cd '${ROOT}/it'`), r.out);
+ok('and the dollar sign is never bare inside double quotes', !r.out.includes('cd \\"'), r.out);
+
+// A broken index is a sentence and an exit code, not a stack trace; and the
+// next `index` rebuilds it even though no transcript changed.
+fs.writeFileSync(INDEX, 'not gzip at all');
+r = run(['stats']);
+eq('stats fails cleanly on an unreadable index', r.status, 1);
+ok('and says what to do', /index is unreadable - run: ccfind.mjs index/.test(r.err), r.err);
+ok('and shows no stack trace', !/at .*\.mjs:\d+/.test(r.err), r.err);
+r = json(['search', 'zorblatt']);
+eq('search fails the same way', r.status, 1);
+ok('search names the problem', /index is unreadable/.test(r.err), r.err);
+r = run(['index']);
+eq('index rebuilds a corrupt index', r.status, 0);
+ok('and does not call it up to date', /indexed 6 sessions/.test(r.err), r.err);
+eq('stats works again', run(['stats']).status, 0);
+
+// The documents file the offsets point into is checked against the size
+// recorded at build time, so a truncated one is rebuilt rather than served.
+fs.truncateSync(DOCS, 10);
+r = json(['search', 'zorblatt']);
+eq('search fails cleanly when the documents do not match', r.status, 1);
+ok('and says so', /do not match - run: ccfind.mjs index/.test(r.err), r.err);
+r = run(['index']);
+ok('index notices the mismatch', /indexed 6 sessions/.test(r.err), r.err);
+eq('search works again', list(json(['search', 'quibblesnap'])), QUOTED);
+
+// A lock left behind by a process that died must not block anyone.
+const dead = spawnSync(process.execPath, ['-e', '0']).pid;
+fs.writeFileSync(LOCKF, String(dead));
+r = run(['index', '--full']);
+eq('a lock held by a dead process is broken', r.status, 0);
+ok('and the rebuild happens', /indexed 6 sessions/.test(r.err), r.err);
+eq('the lock is released afterwards', leftovers().join(','), '');
+fs.writeFileSync(LOCKF, String(process.pid));
+const old = new Date(Date.now() - 20 * 60 * 1000);
+fs.utimesSync(LOCKF, old, old);
+r = run(['index', '--full']);
+eq('a lock older than the stale limit is broken even if its pid is alive', r.status, 0);
+eq('and released', leftovers().join(','), '');
+
+// Two sessions running `index` together is how the skill is used, not an
+// accident. Both must finish, and what they leave behind must be one index
+// with its own documents.
+const both = await Promise.all([0, 1].map(() => new Promise((resolve) => {
+  const p = spawn(process.execPath, [CLI, 'index', '--full'], { env: BASE_ENV });
+  let err = '';
+  p.stderr.on('data', (d) => { err += d; });
+  p.on('close', (code) => resolve({ code, err }));
+})));
+ok('two concurrent full rebuilds both exit 0', both.every((b) => b.code === 0), JSON.stringify(both));
+ok('and both report a rebuild', both.every((b) => /indexed 6 sessions/.test(b.err)), JSON.stringify(both));
+eq('nothing is left staged or locked', leftovers().join(','), '');
+eq('the result is searchable', list(json(['search', 'quibblesnap'])), QUOTED);
+eq('and stats reads it', run(['stats']).status, 0);
 
 // ------------------------------------------------------- the calling model
 

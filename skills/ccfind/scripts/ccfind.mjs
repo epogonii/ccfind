@@ -24,6 +24,10 @@ const STORE = path.join(CONFIG, 'ccfind');
 const DOCS = path.join(STORE, 'docs.jsonl');
 const INDEX = path.join(STORE, 'index.json.gz');
 const STATE = path.join(STORE, 'state.json');
+// Held for the length of one rebuild. SKILL.md has every session run `index`
+// before it searches, so two sessions starting together is the ordinary case,
+// not a corner one.
+const LOCK = path.join(STORE, 'index.lock');
 
 // Field weights: a hit in what the user actually asked outranks a hit in
 // scrollback from a grep that happened to print the word.
@@ -222,6 +226,63 @@ function chunks(text) {
 
 // ---------------------------------------------------------------- index build
 
+// The index on disk, if it was built from exactly these transcripts as they are
+// now; null when anything changed, is missing, or cannot be read. An index
+// written by an older field layout cannot be trusted even when every transcript
+// is unchanged: field ids shift and weights move with them.
+function currentIndex(files) {
+  const prev = readJSON(STATE, {});
+  if (Object.keys(prev).length !== files.length) return null;
+  for (const rel of files) {
+    const st = safeStat(path.join(PROJECTS, rel));
+    const p = prev[rel];
+    if (!st || !p || p.size !== st.size || p.mtimeMs !== st.mtimeMs) return null;
+  }
+  if (!fs.existsSync(DOCS) || !fs.existsSync(INDEX)) return null;
+  let cached = null;
+  try { cached = readIndex(); } catch { /* half-written or corrupt: rebuild */ }
+  // The document file the offsets point into has to be the one written with
+  // them; a size recorded at build time is the cheap way to know. Indexes from
+  // before the size was recorded are still taken at their word.
+  const docsOk = cached?.docsBytes === undefined || cached.docsBytes === safeStat(DOCS)?.size;
+  if (cached && cached.v === IDXV && docsOk) return cached;
+  _index = null;
+  return null;
+}
+
+// One rebuild at a time. Two builders writing the same files interleave, and
+// whichever wins the last rename leaves a document list that belongs to the
+// other's index. A lock left behind by a process that died is broken as soon as
+// its pid is gone, and after a few minutes regardless, so a crash costs a wait
+// and not a store that never rebuilds again.
+const LOCK_STALE_MS = 5 * 60 * 1000;
+function alive(pid) {
+  try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; }
+}
+async function lockStore() {
+  const t0 = Date.now();
+  for (;;) {
+    try {
+      const fd = fs.openSync(LOCK, 'wx');
+      fs.writeSync(fd, String(process.pid));
+      fs.closeSync(fd);
+      return () => { try { fs.unlinkSync(LOCK); } catch { /* already gone */ } };
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+    }
+    const st = safeStat(LOCK);
+    const pid = +(readText(LOCK) || '');
+    if (!st || (Number.isInteger(pid) && pid > 0 && !alive(pid)) || Date.now() - st.mtimeMs > LOCK_STALE_MS) {
+      try { fs.unlinkSync(LOCK); } catch { /* the holder let go first */ }
+      continue;
+    }
+    if (Date.now() - t0 > LOCK_STALE_MS) {
+      throw new Error(`another ccfind has been rebuilding the index for over five minutes - if none is running, remove ${LOCK}`);
+    }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+}
+
 async function buildIndex({ full = false, quiet = false } = {}) {
   const t0 = Date.now();
   fs.mkdirSync(STORE, { recursive: true });
@@ -235,29 +296,36 @@ async function buildIndex({ full = false, quiet = false } = {}) {
     }
   }
 
-  const prev = full ? {} : readJSON(STATE, {});
-  let stale = false;
-  for (const rel of files) {
-    const st = safeStat(path.join(PROJECTS, rel));
-    const p = prev[rel];
-    if (!st || !p || p.size !== st.size || p.mtimeMs !== st.mtimeMs) { stale = true; break; }
+  let cached = full ? null : currentIndex(files);
+  if (cached) {
+    if (!quiet) console.error(`ccfind: index up to date (${files.length} transcripts)`);
+    return cached;
   }
-  if (!full && !stale && Object.keys(prev).length === files.length
-      && fs.existsSync(DOCS) && fs.existsSync(INDEX)) {
-    const cached = readIndex();
-    // An index written by an older field layout cannot be trusted even when
-    // every transcript is unchanged: field ids shift and weights move with them.
-    if (cached && cached.v === IDXV) {
-      if (!quiet) console.error(`ccfind: index up to date (${files.length} transcripts)`);
+
+  const unlock = await lockStore();
+  // Everything is staged under names no other process uses and renamed into
+  // place only once complete, so a reader never sees a file that is half
+  // written, and a build that dies leaves the previous index untouched.
+  const tmp = { docs: `${DOCS}.${process.pid}.tmp`, index: `${INDEX}.${process.pid}.tmp` };
+  try {
+    // The wait may have been for another process doing exactly this rebuild.
+    cached = full ? null : currentIndex(files);
+    if (cached) {
+      if (!quiet) console.error(`ccfind: index up to date (${files.length} transcripts, rebuilt by another ccfind)`);
       return cached;
     }
-    _index = null;
+    return await rebuild(files, tmp, t0, quiet);
+  } finally {
+    for (const p of Object.values(tmp)) { try { fs.unlinkSync(p); } catch { /* renamed or never written */ } }
+    unlock();
   }
-  // v0.1 rebuilds whole corpus on any change: roughly 13 MB/s measured, and a
-  // correct incremental merge is only worth writing once the on-disk format
-  // settles.
+}
 
-  const docsFd = fs.openSync(DOCS, 'w');
+// v0.1 rebuilds whole corpus on any change: roughly 13 MB/s measured, and a
+// correct incremental merge is only worth writing once the on-disk format
+// settles.
+async function rebuild(files, tmp, t0, quiet) {
+  const docsFd = fs.openSync(tmp.docs, 'w');
   const state = {};
   const sessions = [];      // {id, title, project, cwd, branch, first, last, n}
   const sessionIdx = new Map();
@@ -364,6 +432,7 @@ async function buildIndex({ full = false, quiet = false } = {}) {
     sessions[si].n = exchanges.length - x0;
   }
   fs.closeSync(docsFd);
+  const docsBytes = fs.statSync(tmp.docs).size;
 
   const N = docId;
   const avgdl = N ? dl.reduce((a, b) => a + b, 0) / N : 0;
@@ -376,9 +445,17 @@ async function buildIndex({ full = false, quiet = false } = {}) {
   }
 
   const index = { v: IDXV, N, avgdl, dl, offsets, dx, dfld, exchanges, sessions,
-                  postings: post, built: new Date().toISOString(), bytesRead, files: files.length };
-  fs.writeFileSync(INDEX, zlib.gzipSync(Buffer.from(JSON.stringify(index)), { level: 6 }));
+                  postings: post, built: new Date().toISOString(), bytesRead, files: files.length,
+                  docsBytes };
+  fs.writeFileSync(tmp.index, zlib.gzipSync(Buffer.from(JSON.stringify(index)), { level: 6 }));
+  // Documents first, then the index that points into them, then the state that
+  // says both are current. A crash between any two steps leaves something the
+  // next run either reads whole or rebuilds; state last is what makes the
+  // "up to date" answer trustworthy.
+  fs.renameSync(tmp.docs, DOCS);
+  fs.renameSync(tmp.index, INDEX);
   fs.writeFileSync(STATE, JSON.stringify(state));
+  _index = index;
 
   if (!quiet) {
     console.error(
@@ -396,18 +473,36 @@ let _index = null;
 function readIndex() {
   if (_index) return _index;
   if (!fs.existsSync(INDEX)) return null;
-  _index = JSON.parse(zlib.gunzipSync(fs.readFileSync(INDEX)));
+  try {
+    _index = JSON.parse(zlib.gunzipSync(fs.readFileSync(INDEX)));
+  } catch {
+    throw new Error('the index is unreadable - run: ccfind.mjs index');
+  }
   return _index;
 }
 
 function readDoc(idx, id) {
   const off = idx.offsets[id * 2], len = idx.offsets[id * 2 + 1];
-  const fd = fs.openSync(DOCS, 'r');
+  let fd = null;
   try {
+    fd = fs.openSync(DOCS, 'r');
     const buf = Buffer.alloc(len);
-    fs.readSync(fd, buf, 0, len, off);
-    return JSON.parse(buf.toString('utf8'));
-  } finally { fs.closeSync(fd); }
+    const got = fs.readSync(fd, buf, 0, len, off);
+    return JSON.parse(buf.toString('utf8', 0, got));
+  } catch {
+    // Offsets that do not land on a document mean the two files were not
+    // written together.
+    throw new Error('the index and its documents do not match - run: ccfind.mjs index');
+  } finally { if (fd !== null) fs.closeSync(fd); }
+}
+
+// For the commands that need an index and nothing else: a missing or broken
+// one is a usage problem to say in a sentence, not a stack trace.
+function requireIndex() {
+  let idx = null;
+  try { idx = readIndex(); } catch (e) { console.error(`ccfind: ${e.message}`); process.exit(1); }
+  if (!idx) { console.error('ccfind: no index - run: ccfind.mjs index'); process.exit(1); }
+  return idx;
 }
 
 function scoreDocs(idx, query) {
@@ -623,6 +718,7 @@ function readJSON(p, dflt) {
 }
 function safeReaddir(p) { try { return fs.readdirSync(p); } catch { return []; } }
 function safeStat(p) { try { return fs.statSync(p); } catch { return null; } }
+function readText(p) { try { return fs.readFileSync(p, 'utf8'); } catch { return null; } }
 
 function parseArgs(argv) {
   const o = { _: [] };
@@ -811,17 +907,21 @@ const args = parseArgs(process.argv.slice(2));
 const cmd = args._[0] || 'search';
 
 if (cmd === 'index') {
-  await buildIndex({ full: !!args.full });
+  try {
+    await buildIndex({ full: !!args.full });
+  } catch (e) {
+    console.error(`ccfind: ${e.message}`);
+    process.exit(1);
+  }
 } else if (cmd === 'stats') {
-  const idx = readIndex();
-  if (!idx) { console.error('no index'); process.exit(1); }
+  const idx = requireIndex();
   console.log(JSON.stringify({
     built: idx.built, transcripts: idx.files, sessions: idx.sessions.length,
     exchanges: idx.exchanges.length, chunks: idx.N,
     terms: Object.keys(idx.postings).length, avgdl: +idx.avgdl.toFixed(1),
     mbRead: +(idx.bytesRead / 1048576).toFixed(1),
-    indexMb: +(fs.statSync(INDEX).size / 1048576).toFixed(2),
-    docsMb: +(fs.statSync(DOCS).size / 1048576).toFixed(2),
+    indexMb: +((safeStat(INDEX)?.size ?? 0) / 1048576).toFixed(2),
+    docsMb: +((safeStat(DOCS)?.size ?? 0) / 1048576).toFixed(2),
     titled: idx.sessions.filter((s) => s.title).length,
   }, null, 2));
 } else if (cmd === 'show') {
@@ -829,8 +929,7 @@ if (cmd === 'index') {
   // from, every turn in order, so a picked search hit can be understood in place.
   const want = args._[1];
   if (!want) { console.error('usage: ccfind.mjs show <session-id> [--turns N] [--json]'); process.exit(1); }
-  const idx = readIndex();
-  if (!idx) { console.error('no index - run: ccfind.mjs index'); process.exit(1); }
+  const idx = requireIndex();
   const si = idx.sessions.findIndex((x) => x.id.startsWith(want));
   if (si === -1) { console.error(`ccfind: no session starting with ${want}`); process.exit(1); }
   const ses = idx.sessions[si];
@@ -1000,8 +1099,7 @@ import(pathToFileURL(target).href).catch((err) => {
   // paths in it still mean what they meant.
   const want = args._[1];
   if (!want) { console.error('usage: ccfind.mjs open <session-id>'); process.exit(1); }
-  const idx = readIndex();
-  if (!idx) { console.error('no index - run: ccfind.mjs index'); process.exit(1); }
+  const idx = requireIndex();
   const ses = idx.sessions.find((x) => x.id.startsWith(want));
   if (!ses) { console.error(`ccfind: no session starting with ${want}`); process.exit(1); }
   // The id lands unquoted in a shell command below. It is a transcript's file
@@ -1009,7 +1107,11 @@ import(pathToFileURL(target).href).catch((err) => {
   // than run inside the new window.
   if (!/^[A-Za-z0-9._-]+$/.test(ses.id)) { console.error(`ccfind: refusing to launch: session id ${JSON.stringify(ses.id)} is not a plain file name`); process.exit(1); }
   const cwd = ses.cwd && fs.existsSync(ses.cwd) ? ses.cwd : HOME;
-  const inner = `cd ${JSON.stringify(cwd)} && claude --resume ${ses.id}`;
+  // Single quotes are the quoting a POSIX shell reads literally: a `$`, a
+  // backtick or a double quote in a directory name stays a character. JSON
+  // quoting only looks the same, and `$HOME` inside it would expand.
+  const shq = (s) => `'${s.replace(/'/g, `'\\''`)}'`;
+  const inner = `cd ${shq(cwd)} && claude --resume ${ses.id}`;
   // The same command wrapped so a Linux emulator still confirms closing the
   // window. Two things are needed and neither is enough alone. `set -m` turns on
   // job control, which puts `claude` in its own process group: a VTE terminal
@@ -1307,7 +1409,7 @@ import(pathToFileURL(target).href).catch((err) => {
 } else if (cmd === 'bench') {
   const queries = args._.slice(1);
   if (!queries.length) { console.error('bench needs queries'); process.exit(1); }
-  readIndex();
+  requireIndex();
   for (const q of queries) {
     const t = Date.now();
     const r = search(q, { limit: 1 });
