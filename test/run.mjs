@@ -213,6 +213,29 @@ r = json(['search', 'zorblatt', '--days', 'abc']);
 ok('a rejected --days says so on stderr', /ignoring --days abc/.test(r.err), r.err);
 ok('the warning stays out of stdout', r.j !== null, r.out.slice(0, 120));
 
+// ------------------------------------------------------------ other flags
+
+// parseArgs leaves a flag with no value as true, and +true is 1: a bare --limit
+// used to print exactly one hit and say nothing about why.
+const withLimit = json(['search', 'zorblatt', '--all']).j.hits.length;
+r = json(['search', 'zorblatt', '--all', '--limit']);
+eq('a bare --limit is the default limit, not one', r.j.hits.length, withLimit);
+ok('and says so on stderr', /ignoring --limit - not a positive count/.test(r.err), r.err);
+r = json(['search', 'zorblatt', '--all', '--limit', 'abc']);
+eq('--limit abc is the default limit', r.j.hits.length, withLimit);
+ok('--limit abc is reported', /ignoring --limit abc/.test(r.err), r.err);
+r = json(['search', 'zorblatt', '--all', '--limit', '2']);
+eq('a real --limit still limits', r.j.hits.length, 2);
+ok('a real --limit draws no warning', !/ignoring/.test(r.err), r.err);
+r = json(['search', 'zorblatt', '--all', '--group', 'turn']);
+eq('an unknown --group falls back to session', r.j.group, 'session');
+ok('and is reported', /ignoring --group turn - it is session or exchange/.test(r.err), r.err);
+r = json(['search', 'zorblatt', '--all', '--group', 'exchange']);
+ok('a known --group draws no warning', !/ignoring/.test(r.err), r.err);
+r = json(['search', 'zorblatt', '--all', '--exclude']);
+ok('a bare --exclude is reported', /ignoring --exclude - it needs a value/.test(r.err), r.err);
+eq('and excludes nothing', r.j.hits.length, withLimit);
+
 // ------------------------------------------------------------------ show
 
 r = json(['show', RECENT.slice(0, 8)]);

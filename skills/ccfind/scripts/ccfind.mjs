@@ -639,14 +639,17 @@ function parseArgs(argv) {
 
 // A count flag that fails to parse falls back to the default instead of
 // poisoning a slice with NaN ("--limit abc" silently showing zero hits).
+// A bare flag (parseArgs leaves it as true) is not a count of one either.
 function posInt(v, dflt) {
+  if (v === true) return dflt;
   const n = Math.floor(+v);
   return Number.isFinite(n) && n > 0 ? n : dflt;
 }
 
 // Same idea for a window of days, except fractions are meaningful: --days 0.5
 // is the last twelve hours. Not posInt, which would floor that to 0 and quietly
-// drop the filter the user asked for.
+// drop the filter the user asked for. Unlike posInt, a bare --days is kept as
+// one day: "what did I do today" is the question it is short for.
 function posNum(v, dflt) {
   const n = +v;
   return Number.isFinite(n) && n > 0 ? n : dflt;
@@ -834,7 +837,7 @@ if (cmd === 'index') {
   const turns = idx.exchanges
     .map((x, i) => ({ ...x, i }))
     .filter((x) => x.si === si && x.t && x.t !== '(session start)');
-  const cap = args.turns ? posInt(args.turns, 40) : 40;
+  const cap = posInt(args.turns, 40);
   const shown = turns.slice(0, cap);
   if (args.json) {
     console.log(JSON.stringify({
@@ -1327,11 +1330,25 @@ import(pathToFileURL(target).href).catch((err) => {
   if (args.days !== undefined && days === null) {
     console.error(`ccfind: ignoring --days ${args.days} - not a positive number of days`);
   }
+  // The same courtesy for the other flags: a value that cannot be used is
+  // dropped and said so, never quietly turned into something else.
+  const given = (v) => (v === true ? '' : ` ${v}`);
+  const limit = posInt(args.limit, 10);
+  if (args.limit !== undefined && posInt(args.limit, null) === null) {
+    console.error(`ccfind: ignoring --limit${given(args.limit)} - not a positive count`);
+  }
+  const group = args.group === 'exchange' || args.group === 'session' ? args.group : 'session';
+  if (args.group !== undefined && group !== args.group) {
+    console.error(`ccfind: ignoring --group${given(args.group)} - it is session or exchange`);
+  }
+  for (const flag of ['project', 'session', 'field', 'exclude']) {
+    if (args[flag] === true) console.error(`ccfind: ignoring --${flag} - it needs a value`);
+  }
   let res;
   try {
     res = search(q, {
-      limit: posInt(args.limit, 10),
-      group: typeof args.group === 'string' ? args.group : 'session',
+      limit,
+      group,
       project: typeof args.project === 'string' ? args.project : null,
       session: typeof args.session === 'string' ? args.session : null,
       field: typeof args.field === 'string' ? args.field : null,
