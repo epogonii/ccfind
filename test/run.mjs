@@ -415,11 +415,30 @@ const NOHOME = path.join(ROOT, 'nohome');
 fs.mkdirSync(NOHOME, { recursive: true });
 r = (() => {
   const x = spawnSync(process.execPath, [LINK, 'search', 'flimberflam', '--json'],
-    { env: { ...BASE_ENV, HOME: NOHOME, USERPROFILE: NOHOME }, encoding: 'utf8', timeout: 60000 });
+    { env: { ...BASE_ENV, HOME: NOHOME, USERPROFILE: NOHOME, CLAUDE_CONFIG_DIR: '' }, encoding: 'utf8', timeout: 60000 });
   return { status: x.status, out: x.stdout || '', err: x.stderr || '' };
 })();
 eq('the launcher runs the CLI', r.status, 0);
 ok('the launcher produces real output', /"hits"/.test(r.out), r.out + r.err);
+
+// Claude Code keeps the registry under CLAUDE_CONFIG_DIR when that is set. A
+// launcher that only looked in ~/.claude fell back to the version it was
+// installed from, and stopped working at the next plugin update.
+const CFG = path.join(ROOT, 'cfg');
+const PLUG = path.join(CFG, 'plugins', 'cache', 'ccfind', 'ccfind', '9.9.9');
+fs.mkdirSync(path.join(PLUG, 'skills', 'ccfind', 'scripts'), { recursive: true });
+fs.writeFileSync(path.join(PLUG, 'skills', 'ccfind', 'scripts', 'ccfind.mjs'), 'console.log("resolved through the registry: 9.9.9");\n');
+fs.writeFileSync(path.join(CFG, 'plugins', 'installed_plugins.json'), JSON.stringify({
+  version: 2,
+  plugins: { 'ccfind@ccfind': [{ scope: 'user', installPath: PLUG, version: '9.9.9', lastUpdated: '2026-01-01T00:00:00.000Z' }] },
+}));
+r = (() => {
+  const x = spawnSync(process.execPath, [LINK, 'stats'],
+    { env: { ...BASE_ENV, HOME: NOHOME, USERPROFILE: NOHOME, CLAUDE_CONFIG_DIR: CFG }, encoding: 'utf8', timeout: 60000 });
+  return { status: x.status, out: x.stdout || '', err: x.stderr || '' };
+})();
+eq('the launcher runs under CLAUDE_CONFIG_DIR', r.status, 0);
+ok('and resolves the plugin through that registry', /resolved through the registry: 9\.9\.9/.test(r.out), r.out + r.err);
 
 // The PATH advice has to name the startup file the user's own shell reads. A
 // bash user sent to ~/.zshrc edits a file that is never sourced, and the command

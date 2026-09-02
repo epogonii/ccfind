@@ -897,7 +897,10 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
 const FALLBACK = ${JSON.stringify(fallback)};
-const REG = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json');
+// Claude Code keeps its registry under CLAUDE_CONFIG_DIR when that is set, and
+// the shell running this launcher is the same one that set it.
+const CONFIG = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+const REG = path.join(CONFIG, 'plugins', 'installed_plugins.json');
 const script = (p) => path.join(p, 'skills', 'ccfind', 'scripts', 'ccfind.mjs');
 
 let target = FALLBACK;
@@ -937,7 +940,10 @@ import(pathToFileURL(target).href).catch((err) => {
     fs.unlinkSync(link);
     console.log(`removed ${link}`);
   } else {
-    fs.mkdirSync(dir, { recursive: true });
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {
+      console.error(`ccfind: cannot create ${dir}: ${e.message}`);
+      process.exit(1);
+    }
     let st = null;
     try { st = fs.lstatSync(link); } catch { /* free */ }
     if (st && !st.isSymbolicLink()) {
@@ -948,8 +954,13 @@ import(pathToFileURL(target).href).catch((err) => {
         process.exit(1);
       }
     }
-    if (st) fs.unlinkSync(link);
-    fs.writeFileSync(link, launcher(self), { mode: 0o755 });
+    try {
+      if (st) fs.unlinkSync(link);
+      fs.writeFileSync(link, launcher(self), { mode: 0o755 });
+    } catch (e) {
+      console.error(`ccfind: cannot write ${link}: ${e.message}`);
+      process.exit(1);
+    }
     console.log(`installed: ${link}`);
     console.log(`  resolves to the installed plugin, currently ${shortPath(self)}`);
     if (!onPath.includes(dir)) {
