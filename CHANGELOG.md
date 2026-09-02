@@ -3,6 +3,48 @@
 Versions up to 0.16.3 are dated 2026-08-25: the project went from first commit
 to the plugin directory in one sitting, and this log keeps the real steps.
 
+## 0.18.2
+
+- Two sessions starting together is the ordinary case - SKILL.md has every
+  session run `index` before it searches - and the build wrote docs.jsonl,
+  index.json.gz and state.json straight into place. Two builders could
+  interleave their writes, and a search running during a rebuild could read
+  offsets from one index against another's documents, which would surface as
+  "Unexpected token" from JSON.parse or a stack trace from gunzip, then heal
+  itself on the next rebuild and look like flakiness. The build now writes to
+  per-process staging files and renames them into place - documents first, then
+  the index that points into them, then the state that says both are current -
+  so a reader never sees a partial file and a build that dies leaves the
+  previous index intact. One build runs at a time behind `index.lock`; a waiter
+  re-checks whether the build it waited for already covers its transcripts and
+  takes that result instead of repeating the work. A lock left by a dead process
+  is broken as soon as its pid is gone, or after five minutes regardless.
+
+- The index records the size of its document file, so a truncated docs.jsonl is
+  rebuilt rather than served. When an index is unreadable or does not match its
+  documents, `search`, `show`, `open`, `stats` and `bench` say so in one line
+  ending in "run: ccfind.mjs index" instead of a stack trace, and `index`
+  rebuilds it even though no transcript changed. `stats` no longer dies on a
+  missing docs.jsonl.
+
+- `open` quoted the working directory for the shell with JSON.stringify, which
+  looks like shell quoting and is not: a `$` in a directory name expanded and a
+  backtick ran. It is single-quoted now.
+
+- The launcher that `ccfind install` writes looked for installed_plugins.json
+  under ~/.claude only. With CLAUDE_CONFIG_DIR set it never found the registry,
+  fell back to the version it was installed from, and died with "plugin files
+  not found" after the next `claude plugin update`. It now reads the registry
+  where Claude Code keeps it. `install` reports a directory it cannot create or
+  a launcher it cannot write in a sentence rather than a stack trace.
+
+- A flag given with no value - a bare `--limit`, `--turns`, `--group` - was
+  parsed as `true`, and `true` coerces to the number one, so `--limit` returned
+  a single hit and `--turns` showed one message. Such a flag now means its
+  default, and a note on stderr says it was ignored and why; `--project`,
+  `--session`, `--field` and `--exclude` without a value get the same note.
+  A bare `--days` still means one day, on purpose.
+
 ## 0.18.1
 
 - 0.18.0's `client` block never arrived in the case it was written for. A model
